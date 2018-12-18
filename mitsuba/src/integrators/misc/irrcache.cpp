@@ -253,7 +253,7 @@ public:
 		}
 	}
 
-	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec) const {
+	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk) const {
 		Intersection &its = rRec.its;
 
 		if (m_indirectOnly && (rRec.type & RadianceQueryRecord::EDirectSurfaceRadiance))
@@ -276,12 +276,11 @@ public:
 				}
 
 				rRec.type ^= RadianceQueryRecord::EIndirectSurfaceRadiance;
-
 				return E * bsdf->getDiffuseReflectance(its) * INV_PI +
-					m_subIntegrator->Li(ray, rRec);
+					m_subIntegrator->Li(ray, rRec, Smk);
 			}
 		}
-		return m_subIntegrator->Li(ray, rRec);
+		return m_subIntegrator->Li(ray, rRec, Smk);
 	}
 
 	void handleMiss(RayDifferential ray, const RadianceQueryRecord &rRec,
@@ -312,7 +311,8 @@ public:
 					RadianceQueryRecord::ERadianceNoEmission | RadianceQueryRecord::EDistance);
 				rRec2.extra = 1;
 				rRec2.sampler = sampler;
-				entry.L = m_subIntegrator->Li(RayDifferential(rRec.its.p, entry.d, ray.time), rRec2);
+				std::vector<Spectrum> Smk;
+				entry.L = m_subIntegrator->Li(RayDifferential(rRec.its.p, entry.d, ray.time), rRec2, Smk);
 				entry.dist = rRec2.dist;
 				sampler->advance();
 			}

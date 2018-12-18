@@ -135,6 +135,10 @@ public:
 		m_variable = props.getString("variable", "data");
 
 		m_storage = new ImageBlock(Bitmap::ESpectrumAlphaWeight, m_cropSize);
+
+		// Tamar
+		m_variable_grad = props.getString("variable", "data_grad");
+		m_storage_grad = new ImageBlock(Bitmap::ESpectrumAlphaWeight, m_cropSize);
 	}
 
 	MFilm(Stream *stream, InstanceManager *manager)
@@ -168,8 +172,10 @@ public:
 		m_storage->clear();
 	}
 
-	void put(const ImageBlock *block) {
+	void put(const ImageBlock *block) {//, const ImageBlock *block2) {
 		m_storage->put(block);
+		// Tamar
+		//m_storage_grad->put(block2);
 	}
 
 	void setBitmap(const Bitmap *bitmap, Float multiplier) {
@@ -264,6 +270,11 @@ public:
 		ref<Bitmap> bitmap = m_storage->getBitmap()->convert(
 			m_pixelFormat, Bitmap::EFloat);
 
+		// Tamar
+		ref<Bitmap> bitmap_grad = m_storage_grad->getBitmap()->convert(
+			m_pixelFormat, Bitmap::EFloat);
+
+
 		Log(EInfo, "Writing image to \"%s\" ..", filename.filename().string().c_str());
 
 		if (m_fileFormat == EMathematica || m_fileFormat == EMATLAB) {
@@ -275,63 +286,113 @@ public:
 
 			int rowSize = bitmap->getWidth();
 
-			for (int ch=0; ch<bitmap->getChannelCount(); ++ch) {
-				if (m_fileFormat == EMATLAB) {
-					if (ch == 0) {
-						os << m_variable << " = [";
-					} else {
-						os << endl << m_variable << "(:, :, " << ch + 1 << ") = [";
-					}
-				} else {
-					if (ch == 0) {
-						if (bitmap->getChannelCount() == 1)
-							os << m_variable << " = {{";
-						else
-							os << m_variable << " = Transpose[{{{";
-					}
-				}
-				Float *ptr = bitmap->getFloatData();
-				ptr += ch;
-
-				for (int y=0; y < bitmap->getHeight(); y++) {
-					for (int x=0; x < rowSize; x++) {
-						if (m_fileFormat == EMATLAB) {
-							os << *ptr;
-						} else {
-							/* Mathematica uses the peculiar '*^' notation rather than the standard 'e' notation. */
-							std::ostringstream oss;
-							oss << std::setprecision(m_digits);
-							oss << *ptr;
-							std::string str = oss.str();
-							boost::replace_first(str, "e", "*^");
-							os << str;
-						}
-
-						ptr += bitmap->getChannelCount();
-						if (x + 1 < rowSize) {
-							os << ", ";
-						} else {
-							if (m_fileFormat == EMATLAB) {
-								if (y + 1 < bitmap->getHeight())
-									os << ";" << endl << "\t";
-								else
-									os << "];" << endl;
+			bool DEBUG_TAMAR = 0;
+			if (DEBUG_TAMAR)
+				cout << "develop"<< endl;
+			// Tamar
+			for (int vars=0; vars<2; ++vars) {
+				for (int ch=0; ch<bitmap->getChannelCount(); ++ch) {
+					if (m_fileFormat == EMATLAB) {
+						if (ch == 0) {
+							// Tamar
+							if (vars == 0) {
+								os << m_variable << " = [";
 							} else {
-								if (y + 1 < bitmap->getHeight()) {
-									os << "}," << endl << "\t{";
-								} else if (ch + 1 == bitmap->getChannelCount()){
-									if (bitmap->getChannelCount() == 1)
-										os << "}};" << endl;
+								os << m_variable_grad << " = [";
+							}
+						} else {
+							// Tamar
+							if (vars == 0) {
+								os << endl << m_variable << "(:, :, " << ch + 1 << ") = [";
+							} else {
+								os << endl << m_variable_grad << "(:, :, " << ch + 1 << ") = [";
+							}
+						}
+					} else {
+						if (ch == 0) {
+							// Tamar
+							if (vars == 0) {
+								if (bitmap->getChannelCount() == 1)
+									os << m_variable << " = {{";
+								else
+									os << m_variable << " = Transpose[{{{";
+							} else {
+								if (bitmap->getChannelCount() == 1)
+									os << m_variable_grad << " = {{";
+								else
+									os << m_variable_grad << " = Transpose[{{{";
+							}
+						}
+					}
+					// Tamar
+					Float *ptr = bitmap->getFloatData();
+					if (vars == 1) {
+						Float *ptr = bitmap_grad->getFloatData();
+					}
+					ptr += ch;
+
+					if (DEBUG_TAMAR) {
+						cout << "bitmap:" << endl;
+						cout << "float data: " << *bitmap->getFloatData() << endl;
+						cout << "float data address: " << bitmap->getFloatData() << endl;
+						cout << "height: " << bitmap->getHeight() << endl;
+						cout << "width: " << bitmap->getWidth() << endl;
+						cout << "channel count: " << bitmap->getChannelCount() << endl;
+						cout << "bitmap_grad:" << endl;
+						cout << "float data: " << *bitmap_grad->getFloatData() << endl;
+						cout << "float data address: " << bitmap_grad->getFloatData() << endl;
+						cout << "height: " << bitmap_grad->getHeight() << endl;
+						cout << "width: " << bitmap_grad->getWidth() << endl;
+						cout << "channel count: " << bitmap_grad->getChannelCount() << endl;
+					}
+
+					/* // Tamar
+					if (vars == 1) {
+						ref<Bitmap> bitmap = bitmap_grad;
+					}*/
+
+					for (int y=0; y < bitmap->getHeight(); y++) {
+						for (int x=0; x < rowSize; x++) {
+							if (m_fileFormat == EMATLAB) {
+								os << *ptr;
+							} else {
+								/* Mathematica uses the peculiar '*^' notation rather than the standard 'e' notation. */
+								std::ostringstream oss;
+								oss << std::setprecision(m_digits);
+								oss << *ptr;
+								std::string str = oss.str();
+								boost::replace_first(str, "e", "*^");
+								os << str;
+							}
+
+							ptr += bitmap->getChannelCount();
+							if (x + 1 < rowSize) {
+								os << ", ";
+							} else {
+								if (m_fileFormat == EMATLAB) {
+									if (y + 1 < bitmap->getHeight())
+										os << ";" << endl << "\t";
 									else
-										os << "}}}, {3,1,2}];" << endl;
+										os << "];" << endl;
 								} else {
-									os << "}}," << endl << endl << "\t{{";
+									if (y + 1 < bitmap->getHeight()) {
+										os << "}," << endl << "\t{";
+									} else if (ch + 1 == bitmap->getChannelCount()){
+										if (bitmap->getChannelCount() == 1)
+											os << "}};" << endl;
+										else
+											os << "}}}, {3,1,2}];" << endl;
+									} else {
+										os << "}}," << endl << endl << "\t{{";
+									}
 								}
 							}
 						}
 					}
 				}
+
 			}
+
 		} else {
 			unsigned int shape[] = {
 				(unsigned int) bitmap->getHeight(),
@@ -393,6 +454,10 @@ protected:
 	ref<ImageBlock> m_storage;
 	std::string m_variable;
 	int m_digits;
+
+	// Tamar
+	std::string m_variable_grad;
+	ref<ImageBlock> m_storage_grad;
 };
 
 MTS_IMPLEMENT_CLASS_S(MFilm, false, Film)

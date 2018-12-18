@@ -174,7 +174,7 @@ public:
 		stream->writeInt(m_subSteps);
 	}
 
-	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec) const {
+	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<mitsuba::Spectrum> &Smk) const {
 		const Point2 apertureSample(0.5f);
 		Point p0, p1;
 

@@ -45,6 +45,13 @@ public:
 	/// Look up a floating point value by position
 	virtual Float lookupFloat(const Point &p) const;
 
+	// Tamar
+//	virtual int getVolumeSize() const;
+
+	// Tamar
+	/// return grid derivative at position p
+	virtual void gridDerivative(const Point &_p, std::vector<float> &innerDev, std::vector<int> &devIndxs) const;
+
 	/// Are spectrum-valued lookups permitted?
 	virtual bool supportsSpectrumLookups() const;
 

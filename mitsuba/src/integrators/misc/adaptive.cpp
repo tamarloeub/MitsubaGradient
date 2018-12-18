@@ -151,8 +151,8 @@ public:
 			RayDifferential eyeRay;
 			Spectrum sampleValue = sensor->sampleRay(
 				eyeRay, samplePos, apertureSample, timeSample);
-
-			sampleValue *= m_subIntegrator->Li(eyeRay, rRec);
+			std::vector<Spectrum> Smk;
+			sampleValue *= m_subIntegrator->Li(eyeRay, rRec, Smk);//, scene->getSmk());
 			luminance += sampleValue.getLuminance();
 		}
 
@@ -211,6 +211,7 @@ public:
 
 			Float mean = 0, meanSqr = 0.0f;
 			sampleCount = 0;
+			std::vector<Spectrum> Smk;
 
 			while (true) {
 				if (stop)
@@ -229,7 +230,7 @@ public:
 					eyeRay, samplePos, apertureSample, timeSample);
 				eyeRay.scaleDifferential(diffScaleFactor);
 
-				sampleValue *= m_subIntegrator->Li(eyeRay, rRec);
+				sampleValue *= m_subIntegrator->Li(eyeRay, rRec, Smk);
 
 				Float sampleLuminance;
 				if (block->put(samplePos, sampleValue, rRec.alpha)) {
@@ -284,8 +285,8 @@ public:
 		}
 	}
 
-	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec) const {
-		return m_subIntegrator->Li(ray, rRec);
+	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk) const {
+		return m_subIntegrator->Li(ray, rRec, Smk);
 	}
 
 	Spectrum E(const Scene *scene, const Intersection &its, const Medium *medium,

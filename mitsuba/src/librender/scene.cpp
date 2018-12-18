@@ -456,6 +456,11 @@ void Scene::cancel() {
 }
 
 void Scene::flush(RenderQueue *queue, const RenderJob *job) {
+	bool DEBUG_TAMAR = 0;
+	if (DEBUG_TAMAR) {
+		cout << "scene flush" << endl;
+		cout << m_sensor->getFilm()->toString() << endl;
+	}
 	m_sensor->getFilm()->develop(this, queue->getRenderTime(job));
 }
 
@@ -471,6 +476,12 @@ void Scene::postprocess(RenderQueue *queue, const RenderJob *job,
 		int sceneResID, int sensorResID, int samplerResID) {
 	m_integrator->postprocess(this, queue, job, sceneResID,
 		sensorResID, samplerResID);
+
+	bool DEBUG_TAMAR = 0;
+	if (DEBUG_TAMAR) {
+		cout << "scene postprocess" << endl;
+		cout << m_sensor->getFilm()->toString() << endl;
+	}
 	m_sensor->getFilm()->develop(this, queue->getRenderTime(job));
 }
 

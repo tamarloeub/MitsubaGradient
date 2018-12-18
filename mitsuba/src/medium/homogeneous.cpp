@@ -399,6 +399,17 @@ public:
 		return true;
 	}
 
+	// Tamar
+//	int getDensityVolumeSize() const {
+//		Log(EError, "Homogeneous Medium: does not implement getDensityVolumeSize()!");
+//		return 0;
+//	}
+
+	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay) const {
+		Log(EError, "Homogeneous Medium: does not implement gridDerivative()!");
+		return;
+	}
+
 	std::string toString() const {
 		std::ostringstream oss;
 		oss << "HomogeneousMedium[" << endl

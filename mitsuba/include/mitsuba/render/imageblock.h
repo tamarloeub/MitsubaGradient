@@ -165,23 +165,48 @@ public:
 			              max(std::min((int) std::floor(pos.x + filterRadius), size.x - 1),
 			                  std::min((int) std::floor(pos.y + filterRadius), size.y - 1));
 
+			bool DEBUG_TAMAR = 0;
+
+			if (DEBUG_TAMAR) {
+				cout << "put:" << endl;
+			}
+
 			/* Lookup values from the pre-rasterized filter */
-			for (int x=min.x, idx = 0; x<=max.x; ++x)
+			for (int x=min.x, idx = 0; x<=max.x; ++x) {
 				m_weightsX[idx++] = m_filter->evalDiscretized(x-pos.x);
-			for (int y=min.y, idx = 0; y<=max.y; ++y)
+				if (DEBUG_TAMAR) {
+					cout << "m_weightsX[" << x << "] = " <<  m_filter->evalDiscretized(x-pos.x) << endl;
+				}
+			}
+			for (int y=min.y, idx = 0; y<=max.y; ++y) {
 				m_weightsY[idx++] = m_filter->evalDiscretized(y-pos.y);
+				if (DEBUG_TAMAR) {
+					cout << "m_weightsY[" << y << "] = " << m_filter->evalDiscretized(y-pos.y) << endl;
+				}
+			}
 
 			/* Rasterize the filtered sample into the framebuffer */
 			for (int y=min.y, yr=0; y<=max.y; ++y, ++yr) {
 				const Float weightY = m_weightsY[yr];
 				Float *dest = m_bitmap->getFloatData()
 					+ (y * (size_t) size.x + min.x) * channels;
-
+				if (DEBUG_TAMAR) {
+					cout << "dest:" << endl;
+					cout << "before = "<< *dest << endl;
+				}
 				for (int x=min.x, xr=0; x<=max.x; ++x, ++xr) {
 					const Float weight = m_weightsX[xr] * weightY;
 
-					for (int k=0; k<channels; ++k)
+					for (int k=0; k<channels; ++k) {
 						*dest++ += weight * value[k];
+						if (DEBUG_TAMAR) {
+							cout << "*dest = " << *dest << endl;
+							cout << "after = "<< weight * value[k] << endl;
+						}
+					}
+					if (DEBUG_TAMAR)
+						cout << "*dest" << *dest << endl;
+
 				}
 			}
 		}

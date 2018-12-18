@@ -8,14 +8,14 @@
 		<string name="method" value="woodcock"/>
 
 		<volume name="density" type="gridvolume">
-			<string name="filename" value="10VoxelMedium_beta0.9.vol"/>
+			<string name="filename" value="2VoxelMedium_beta0.9.vol"/>
 		</volume>
 
 		<volume name="albedo" type="constvolume">
-			<spectrum name="value" value="0.98"/>
+			<spectrum name="value" value="1"/>
 		</volume>
 		
-    <float name="scale" value="20"/>
+    <float name="scale" value="1"/>
 
 		<phase type="hg">
       <float name="g" value="0.85"/>                                                               
@@ -26,8 +26,21 @@
 		<string name="filename" value="bounds_padded.obj"/>
 		<ref name="interior" id="oneVoxel"/>
 	</shape>
+ 
+  <sensor type="radiancemeter">
+		<transform name="toWorld">
+			<lookat	origin="0, 0, 3" target="0, 0, 1"/>
+		</transform>
 
-	<sensor type="perspective">
+		<sampler type="ldsampler">
+			<integer name="sampleCount" value="4096"/>
+		</sampler>
+   
+    <film type="mfilm"/>
+
+	</sensor>
+ 
+	<!--<sensor type="perspective">
 		<transform name="toWorld">
 			<lookat	target="0, 0, 0" origin="0  0  20"/>
 		</transform>
@@ -41,12 +54,12 @@
 			<integer name="width" value="100"/>
 		</film>
     <ref name="interior" id="oneVoxel"/>
-	</sensor>
+	</sensor>-->
 
 	
 	<emitter type="directional">
 		<vector name="direction" x="0" y="0" z="-1"/>
-    <spectrum name="irradiance" value="10"/>
+    <spectrum name="irradiance" value="1"/>
 	</emitter>
 
 </scene>

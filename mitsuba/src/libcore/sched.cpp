@@ -621,6 +621,8 @@ void Worker::clear() {
 	m_schedItem.wp = NULL;
 	m_schedItem.workUnit = NULL;
 	m_schedItem.workResult = NULL;
+	// Tamar
+	//m_schedItem.workResult2 = NULL;
 	m_schedItem.id = -1;
 }
 
@@ -649,7 +651,8 @@ LocalWorker::~LocalWorker() {
 void LocalWorker::run() {
 	while (acquireWork(true) != Scheduler::EStop) {
 		try {
-			m_schedItem.wp->process(m_schedItem.workUnit, m_schedItem.workResult, m_schedItem.stop);
+			// Tamar
+			m_schedItem.wp->process(m_schedItem.workUnit, m_schedItem.workResult, m_schedItem.stop);//, m_schedItem.workResult2, m_schedItem.stop);
 		} catch (const std::exception &ex) {
 			m_schedItem.stop = true;
 			releaseWork(m_schedItem);

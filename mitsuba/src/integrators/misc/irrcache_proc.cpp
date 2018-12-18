@@ -119,7 +119,8 @@ public:
 								| RadianceQueryRecord::EDistance, m_sensor->getMedium());
 							rRec.extra = RadianceQueryRecord::ECacheQuery;
 							rRec.depth = 2;
-							entry.L = integrator->Li(RayDifferential(its.p, entry.d, 0.0f), rRec);
+							std::vector<Spectrum> Smk;
+							entry.L = integrator->Li(RayDifferential(its.p, entry.d, 0.0f), rRec, Smk);
 							entry.dist = rRec.dist;
 							m_sampler->advance();
 						}

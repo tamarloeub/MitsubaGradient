@@ -1365,8 +1365,9 @@ public:
 															  // first.
 					its.shape->getExteriorMedium());
 				query.depth = depth;
+				std::vector<Spectrum> Smk;
 				Spectrum refracted = m_integrator->Li(
-					RayDifferential(its2.p, dOutgoing, its.time), query);
+					RayDifferential(its2.p, dOutgoing, its.time), query, Smk);
 				refracted *= bsdfAtt;
 				refracted *= attenuation(m_sigmaT, -thickness);
 				result += refracted;
@@ -1618,7 +1619,8 @@ public:
 					its.shape->getExteriorMedium());
 				query.depth = depth + 1;
 				RayDifferential ray(its.p, dBounced, its.time);
-				result += reflectAttenuation * m_integrator->Li(ray, query);
+				std::vector<Spectrum> Smk;
+				result += reflectAttenuation * m_integrator->Li(ray, query, Smk);
 			}
 		}
 		//---- Perform refractions (if any) and single scatter ----------------------

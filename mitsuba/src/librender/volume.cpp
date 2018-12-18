@@ -43,6 +43,17 @@ Float VolumeDataSource::lookupFloat(const Point &p) const {
 	Log(EError, "'%s': does not implement lookupFloat()!", getClass()->getName().c_str());
 	return 0;
 }
+// Tamar
+//int* VolumeDataSource::getVolumeSizeVec() const{
+//	Log(EError, "'%s': does not implement getVolumeSizeVec()!", getClass()->getName().c_str());
+//	return 0;
+//}
+
+// Tamar
+void VolumeDataSource::gridDerivative(const Point &_p, std::vector<float> &innerDev, std::vector<int> &devIndxs) const {
+	Log(EError, "'%s': does not implement gridDerivative()!", getClass()->getName().c_str());
+	return;
+}
 
 Spectrum VolumeDataSource::lookupSpectrum(const Point &p) const {
 	Log(EError, "'%s': does not implement lookupSpectrum()!", getClass()->getName().c_str());

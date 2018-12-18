@@ -167,6 +167,21 @@ public:
 		}
 	}
 
+	// Tamar
+//	int* getVolumeSizeVec() const {
+//		return { m_res.x,  m_res.y,  m_res.z };
+
+		// Tamar - do we need to consider that?/
+//		switch (m_volumeType) {
+//			case EFloat32: return 4 * nEntries * m_channels;
+//			case EFloat16: return 2 * nEntries * m_channels;
+//			case EUInt8:   return 1 * nEntries * m_channels;
+//			case EQuantizedDirections:  return 2 * nEntries;
+//			default:
+//				Log(EError, "Unknown volume format!");
+//				return 0;
+//		}
+//	}
 	void serialize(Stream *stream, InstanceManager *manager) const {
 		VolumeDataSource::serialize(stream, manager);
 
@@ -351,6 +366,7 @@ public:
 		switch (m_volumeType) {
 			case EFloat32: {
 				const float *floatData = (float *) m_data;
+				// const float *floatGradData = (float *) m_grad_data;
 				const Float
 					d000 = floatData[(z1*m_res.y + y1)*m_res.x + x1],
 					d001 = floatData[(z1*m_res.y + y1)*m_res.x + x2],
@@ -360,6 +376,8 @@ public:
 					d101 = floatData[(z2*m_res.y + y1)*m_res.x + x2],
 					d110 = floatData[(z2*m_res.y + y2)*m_res.x + x1],
 					d111 = floatData[(z2*m_res.y + y2)*m_res.x + x2];
+
+					// floatGradData[(z1*m_res.y + y1)*m_res.x + x1] = -_fx * _fy * _fz
 
 				return ((d000*_fx + d001*fx)*_fy +
 						(d010*_fx + d011*fx)*fy)*_fz +
@@ -384,6 +402,59 @@ public:
 			}
 			default:
 				return 0.0f;
+		}
+	}
+
+	//Tamar
+	void gridDerivative(const Point &_p, std::vector<float> &innerDev, std::vector<int> &devIndxs) const {
+		bool DEBUG_TAMAR = 0;
+		if (DEBUG_TAMAR) {
+			cout << "gridDerivative():" << endl;
+			cout << "innerDev:" << innerDev.at(0) << endl;
+			cout << "devIndxs:" << devIndxs.at(0) << endl;
+		}
+		
+		const Point p = m_worldToGrid.transformAffine(_p);
+		const int x1 = math::floorToInt(p.x),
+			  y1 = math::floorToInt(p.y),
+			  z1 = math::floorToInt(p.z),
+			  x2 = x1+1, y2 = y1+1, z2 = z1+1;
+
+		if (x1 < 0 || y1 < 0 || z1 < 0 || x2 >= m_res.x ||
+			y2 >= m_res.y || z2 >= m_res.z)
+			return;
+
+		const Float fx = p.x - x1,
+				    fy = p.y - y1,
+				    fz = p.z - z1,
+				    _fx = 1.0f - fx,
+				    _fy = 1.0f - fy,
+				    _fz = 1.0f - fz;
+
+		devIndxs.at(0) = (z1*m_res.y + y1)*m_res.x + x1;
+		devIndxs.at(1) = (z1*m_res.y + y1)*m_res.x + x2;
+		devIndxs.at(2) = (z1*m_res.y + y2)*m_res.x + x1;
+		devIndxs.at(3) = (z1*m_res.y + y2)*m_res.x + x2;
+		devIndxs.at(4) = (z2*m_res.y + y1)*m_res.x + x1;
+		devIndxs.at(5) = (z2*m_res.y + y1)*m_res.x + x2;
+		devIndxs.at(6) = (z2*m_res.y + y2)*m_res.x + x1;
+		devIndxs.at(7) = (z2*m_res.y + y2)*m_res.x + x2;
+
+		innerDev.at(0) = _fx * _fy * _fz;
+		innerDev.at(1) =  fx * _fy * _fz;
+		innerDev.at(2) = _fx *  fy * _fz;
+		innerDev.at(3) =  fx *  fy * _fz;
+		innerDev.at(4) = _fx * _fy *  fz;
+		innerDev.at(5) =  fx * _fy *  fz;
+		innerDev.at(6) = _fx *  fy *  fz;
+		innerDev.at(7) =  fx *  fy *  fz;
+
+		if (DEBUG_TAMAR) {
+			cout << "innerDev: " << innerDev.at(0) << endl;
+			cout << "calc 0: " << _fx * _fy * _fz << endl;
+			cout << "devIndxs: " << devIndxs.at(0) << endl;
+			cout << "calc 0: " << (z1*m_res.y + y1)*m_res.x + x1 << endl;
+			cout << endl;
 		}
 	}
 

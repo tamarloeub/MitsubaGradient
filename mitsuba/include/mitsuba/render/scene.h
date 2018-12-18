@@ -1103,6 +1103,9 @@ public:
 	/// Return referenced objects (such as textures, BSDFs)
 	inline const ref_vector<ConfigurableObject> &getReferencedObjects() const { return m_objects; }
 
+	//Tamar
+//	inline const std::vector<Spectrum> &getSmk() const { return m_Smk; }
+
 	/// Return the name of the file containing the original description of this scene
 	inline const fs::path &getSourceFile() const { return *m_sourceFile; }
 	/// Set the name of the file containing the original description of this scene
@@ -1165,6 +1168,9 @@ private:
 	uint32_t m_blockSize;
 	bool m_degenerateSensor;
 	bool m_degenerateEmitters;
+	//Tamar
+//	std::vector<Spectrum> m_Smk;
+
 };
 
 MTS_NAMESPACE_END

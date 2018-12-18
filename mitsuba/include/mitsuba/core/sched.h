@@ -153,7 +153,8 @@ public:
 	 * to be undefined (it will simply be ignored). A thrown exception will
 	 * lead to the termination of the parallel process.
 	 */
-	virtual void process(const WorkUnit *workUnit, WorkResult *workResult,
+	// Tamar
+	virtual void process(const WorkUnit *workUnit, WorkResult *workResult,// WorkResult *workResult2,
 		const bool &stop) = 0;
 
 	MTS_DECLARE_CLASS()
@@ -251,7 +252,8 @@ public:
 	 * \param result Work result to be processed
 	 * \param cancelled Was the associated work unit not fully completed
 	 */
-	virtual void processResult(const WorkResult *result,
+	// Tamar
+	virtual void processResult(const WorkResult *result, //const WorkResult *result2,
 		bool cancelled) = 0;
 
 	/**
@@ -528,6 +530,8 @@ public:
 		ref<WorkProcessor> wp;
 		ref<WorkUnit> workUnit;
 		ref<WorkResult> workResult;
+		// Tamar
+//		ref<WorkResult> workResult2;
 		bool stop;
 
 		inline Item() : id(-1), workerIndex(-1), coreOffset(-1),
@@ -593,8 +597,10 @@ protected:
 
 	inline void releaseWork(Item &item) {
 		ProcessRecord *rec = item.rec;
+
 		try {
-			item.proc->processResult(item.workResult, item.stop);
+			// Tamar
+			item.proc->processResult(item.workResult, item.stop);//, item.workResult2, item.stop);
 		} catch (const std::exception &ex) {
 			Log(EWarn, "Caught an exception - canceling process %i: %s",
 				item.id, ex.what());
@@ -638,6 +644,8 @@ protected:
 			item.wp->prepare();
 			item.workUnit = item.wp->createWorkUnit();
 			item.workResult = item.wp->createWorkResult();
+			// Tamar
+//			item.workResult2 = item.wp->createWorkResult();
 		} catch (std::exception &) {
 			throw;
 		}

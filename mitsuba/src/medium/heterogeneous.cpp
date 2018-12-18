@@ -280,6 +280,147 @@ public:
 		}
 	}
 
+	// Tamar
+//	int getDensityVolumeSize() const {
+//		int val = 8;
+//		return val;
+////		return m_density->getVolumeSize();
+//	}
+
+	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay) const {
+		// int* volSize = m_density->getVolumeSizeVec();
+		// cout << volSize << endl;
+		// Float devDensity = new Float[volSize[0]][volSize[1]][volSize[2]];
+
+		/* Determine the ray segment, along which the
+		   density integration should take place */
+		Float mint, maxt;
+		if (!m_densityAABB.rayIntersect(ray, mint, maxt))
+			return;
+
+		mint = std::max(mint, ray.mint);
+		maxt = std::min(maxt, ray.maxt);
+		Float length = maxt-mint, maxComp = 0;
+
+		Point p = ray(mint), pLast = ray(maxt);
+
+		/* Ignore degenerate path segments */
+		for (int i=0; i<3; ++i)
+			maxComp = std::max(std::max(maxComp,
+				std::abs(p[i])), std::abs(pLast[i]));
+		if (length < 1e-6f * maxComp)
+			return;
+
+		/* Compute a suitable step size */
+		uint32_t nSteps = (uint32_t) std::ceil(length / m_stepSize);
+		nSteps += nSteps % 2;
+		const Float stepSize = length/nSteps;
+		const Vector increment = ray.d * stepSize;
+
+		bool DEBUG_TAMAR = 0;
+		if (DEBUG_TAMAR){
+			cout << endl;
+			cout << "derivate grid:" << endl;
+			cout << endl;
+			cout << "p start = " << p.toString() << endl;
+			cout << "p last = " << pLast.toString() << endl;
+			cout << "nSteps = " << nSteps << endl;
+			cout << "stepSize = " << stepSize << endl;
+			cout << "length = " << length << endl;
+		}
+
+		#if defined(HETVOL_STATISTICS)
+			avgRayMarchingStepsTransmittance.incrementBase();
+			earlyExits.incrementBase();
+		#endif
+
+		// /* Perform lookups at the first and last node */
+		// Float devDensity = lookupDensity(p, ray.d)
+		// + lookupDensity(pLast, ray.d);
+
+		// #if defined(HETVOL_EARLY_EXIT)
+		// const Float stopAfterDensity = -math::fastlog(Epsilon);
+		// const Float stopValue = stopAfterDensity*3.0f/(stepSize
+		// * m_scale);
+		// #endif
+
+		p += increment;
+
+		if (DEBUG_TAMAR){
+			cout << "p curr = " << p.toString() << endl;
+		}
+		std::vector<float> inDev(8); // vector contains the value of the 8'th grid derivations value
+		std::vector<int>   inIndxs(8); // vector contains the indexes of the 8'th grid points
+
+		for (uint32_t i=1; i<nSteps + 1; ++i) {
+			// Tamar  - should we deal with anisotrpoic medium like in lookupDensity
+
+			std::fill(inDev.begin(), inDev.end(), 0);
+			std::fill(inIndxs.begin(), inIndxs.end(), 0);
+			
+			if (DEBUG_TAMAR){
+				cout << "inner Dev struct:" << inDev.at(0) << endl;
+				cout << "inner indxs struct:" << inIndxs.at(0) << endl;
+			}
+
+			m_density->gridDerivative(p, inDev, inIndxs);
+
+			if (DEBUG_TAMAR){
+				cout << "inDev.at(0) = " << inDev.at(0) << endl;
+				cout << "inDev.at(1) = " << inDev.at(1) << endl;
+				cout << "inDev.at(2) = " << inDev.at(2) << endl;
+				cout << "inDev.at(3) = " << inDev.at(3) << endl;
+				cout << "inDev.at(4) = " << inDev.at(4) << endl;
+				cout << "inDev.at(5) = " << inDev.at(5) << endl;
+				cout << "inDev.at(6) = " << inDev.at(6) << endl;
+				cout << "inDev.at(7) = " << inDev.at(7) << endl;
+				cout << endl;
+				cout << "i = " << i << endl;
+				cout << "p curr = " << p.toString() << endl;
+			}
+
+			// update medium recored
+			mRec.devIndxs.insert(mRec.devIndxs.end(), inIndxs.begin(), inIndxs.end());
+
+			if ((i == nSteps) || (isDirectRay == false)) {
+				// calculating :  inDev *= (1 / betaAtT -stepSize )
+				Float densityAtT = lookupDensity(p, ray.d) * m_scale;
+				std::transform( inDev.begin(), inDev.end(), inDev.begin(), std::bind1st(std::multiplies<float>(), ( 1 / densityAtT - stepSize )) );
+			} else {
+				// calculating :  inDev *= ( -stepSize );
+				std::transform( inDev.begin(), inDev.end(), inDev.begin(), std::bind1st(std::multiplies<float>(), ( -stepSize )) );
+			}
+			mRec.devVals.insert(mRec.devVals.end(), inDev.begin(), inDev.end());
+
+//			#if defined(HETVOL_STATISTICS)
+//				++avgRayMarchingStepsTransmittance;
+//			#endif
+
+//			#if defined(HETVOL_EARLY_EXIT)
+//				if (integratedDensity > stopValue) {
+//					// Reached the threshold -- stop early
+//					#if defined(HETVOL_STATISTICS)
+//						++earlyExits;
+//					#endif
+//					return std::numeric_limits<Float>::infinity();
+//				}
+//			#endif
+
+			Point next = p + increment;
+			if (p == next) {
+				Log(EWarn, "derivateDensity(): unable to make forward progress -- "
+						"round-off error issues? The step size was %e, mint=%f, "
+						"maxt=%f, nSteps=%i, ray=%s", stepSize, mint, maxt, nSteps,
+						ray.toString().c_str());
+				break;
+			}
+			p = next;
+		}
+
+		return;
+	}
+
+
 	/*
 	 * This function uses Simpson quadrature to compute following
 	 * integral:
@@ -550,6 +691,7 @@ public:
 			/* When Woodcock tracking is selected as the sampling method,
 			   we can use this method to get a noisy (but unbiased) estimate
 			   of the transmittance */
+			   
 			Float mint, maxt;
 			if (!m_densityAABB.rayIntersect(ray, mint, maxt))
 				return Spectrum(1.0f);
@@ -590,6 +732,7 @@ public:
 			Sampler *sampler) const {
 		Float integratedDensity, densityAtMinT, densityAtT;
 		bool success = false;
+		bool DEBUG_TAMAR = 0;
 
 		if (m_method == ESimpsonQuadrature) {
 			Float desiredDensity = -math::fastlog(1-sampler->next1D());
@@ -599,6 +742,8 @@ public:
 				success = true;
 				Spectrum albedo = m_albedo->lookupSpectrum(mRec.p);
 				mRec.sigmaS = albedo * densityAtT;
+				// Tamar
+				mRec.beta   = densityAtT;
 				mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 				mRec.orientation = m_orientation != NULL
 					? m_orientation->lookupVector(mRec.p) : Vector(0.0f);
@@ -645,12 +790,27 @@ public:
 					mRec.p = p;
 					Spectrum albedo = m_albedo->lookupSpectrum(p);
 					mRec.sigmaS = albedo * densityAtT;
+					// Tamar
+					mRec.beta   = densityAtT;
 					mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 					mRec.transmittance = Spectrum(densityAtT != 0.0f ? 1.0f / densityAtT : 0);
 					if (!std::isfinite(mRec.transmittance[0])) // prevent rare overflow warnings
 						mRec.transmittance = Spectrum(0.0f);
 					mRec.orientation = m_orientation != NULL
 						? m_orientation->lookupVector(p) : Vector(0.0f);
+
+					// Tamar
+					derivateDensity(ray, mRec, false);
+
+					if (DEBUG_TAMAR) {
+						cout << "sample dist:" << endl;
+						cout <<  "size of mRec.devVals = " << mRec.devVals.size() << endl;
+						for(std::vector<int>::size_type i = 0; i != mRec.devVals.size(); i++) {
+						    cout << "mRec.derivative[" << mRec.devIndxs[i] << "] = "
+						    		<< mRec.devVals[i] << endl;
+						}
+					}
+
 					mRec.medium = this;
 					success = true;
 					break;
@@ -665,6 +825,8 @@ public:
 	void eval(const Ray &ray, MediumSamplingRecord &mRec) const {
 		if (m_method == ESimpsonQuadrature) {
 			Float expVal = math::fastexp(-integrateDensity(ray));
+			cout << "eval"<<endl;
+//			Float mL   = derivateDensity(ray, mRec);
 			Float mintDensity = lookupDensity(ray(ray.mint), ray.d) * m_scale;
 			Float maxtDensity = 0.0f;
 			Spectrum maxtAlbedo(0.0f);
@@ -681,6 +843,8 @@ public:
 			mRec.sigmaA = Spectrum(maxtDensity) - mRec.sigmaS;
 			mRec.time = ray.time;
 			mRec.medium = this;
+			// Tamar
+			mRec.beta  = maxtDensity;
 		} else {
 			Log(EError, "eval(): unsupported integration method!");
 		}

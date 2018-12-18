@@ -85,7 +85,7 @@ public:
 	SimpleVolumetricPathTracer(Stream *stream, InstanceManager *manager)
 	 : MonteCarloIntegrator(stream, manager) { }
 
-	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec) const {
+	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk) const {
 		/* Some aliases and local variables */
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;
@@ -99,6 +99,8 @@ public:
 		   intersection has already been provided). */
 		rRec.rayIntersect(ray);
 		Spectrum throughput(1.0f);
+//		Spectrum throughput_grad(1.0f);	// Tamar
+
 
 		if (m_maxDepth == 1)
 			rRec.type &= RadianceQueryRecord::EEmittedRadiance;
@@ -109,17 +111,42 @@ public:
 		 * exactly match the output of other integrators under all settings
 		 * of this parameter.
 		 */
+
+		/* debug */
+		bool DEBUG_TAMAR = 0;
+		if (DEBUG_TAMAR)
+			cout << "start:" << endl;
+
 		while (rRec.depth <= m_maxDepth || m_maxDepth < 0) {
 			/* ==================================================================== */
 			/*                 Radiative Transfer Equation sampling                 */
 			/* ==================================================================== */
+
 			if (rRec.medium && rRec.medium->sampleDistance(Ray(ray, 0, its.t), mRec, rRec.sampler)) {
 				/* Sample the integral
 				   \int_x^y tau(x, x') [ \sigma_s \int_{S^2} \rho(\omega,\omega') L(x,\omega') d\omega' ] dx'
 				*/
+
+				if (DEBUG_TAMAR) {
+					cout << ray.toString();
+					cout << "throughput: " << throughput.toString() << endl;
+//					cout << "throughput_grad: " << throughput_grad.toString() << endl;
+					cout << "mRec: [" << endl;
+					cout << " sigmaS = " <<  (mRec.sigmaS).toString() << endl;
+					cout << " pdfSuccess = " << mRec.pdfSuccess  << endl;
+					cout << " transmittance = " << (mRec.transmittance).toString() << endl;
+					cout << endl;
+				}
+
 				const PhaseFunction *phase = rRec.medium->getPhaseFunction();
 
 				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
+				// build Smk
+				for(std::vector<int>::size_type i = 0; i != mRec.devIndxs.size(); i++) {
+					Smk[mRec.devIndxs[i]] += throughput * mRec.devVals[i];
+				}
+				// Tamar
+//				throughput_grad *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 
 				/* ==================================================================== */
 				/*                     Direct illumination sampling                     */
@@ -134,9 +161,18 @@ public:
 							dRec, rRec.medium, maxInteractions,
 							rRec.nextSample2D(), rRec.sampler);
 
-					if (!value.isZero())
-						Li += throughput * value * phase->eval(
+					if (!value.isZero()) {
+						Float phaseVal = phase->eval(
 								PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d));
+						Li += throughput * value * phaseVal;
+						MediumSamplingRecord mdRec;
+						RayDifferential rayD = RayDifferential(mRec.p, mRec.orientation ,mRec.time);
+						rRec.medium->derivateDensity(rayD, mdRec, true);
+						for(std::vector<int>::size_type i = 0; i != mdRec.devIndxs.size(); i++) {
+							Smk[mdRec.devIndxs[i]] += throughput * mdRec.devVals[i] * phaseVal;
+						}
+
+					}
 				}
 
 				/* Stop if multiple scattering was not requested, or if the path gets too long */
@@ -153,6 +189,8 @@ public:
 				if (phaseVal == 0)
 					break;
 				throughput *= phaseVal;
+				// Tamar
+//				throughput_grad *= (1 - mRec.beta * mRec.p) / mRec.beta;
 
 				/* Trace a ray in this direction */
 				ray = Ray(mRec.p, pRec.wo, ray.time);
@@ -165,9 +203,13 @@ public:
 					tau(x, y) * (Surface integral). This happens with probability mRec.pdfFailure
 					Account for this and multiply by the proper per-color-channel transmittance.
 				*/
+				if (DEBUG_TAMAR)
+					cout << ray.toString();
 
 				if (rRec.medium)
 					throughput *= mRec.transmittance / mRec.pdfFailure;
+					// Tamar
+//					throughput_grad *= mRec.transmittance / mRec.pdfFailure;
 
 				if (!its.isValid()) {
 					/* If no intersection could be found, possibly return
@@ -175,8 +217,17 @@ public:
 					if ((rRec.type & RadianceQueryRecord::EEmittedRadiance)
 						&& (!m_hideEmitters || scattered)) {
 						Spectrum value = throughput * scene->evalEnvironment(ray);
-						if (rRec.medium)
+						if (rRec.medium) {
 							value *= rRec.medium->evalTransmittance(ray);
+							if (DEBUG_TAMAR) {
+								cout << "throughput: " << throughput.toString() << endl;
+								cout << "mRec: [" << endl;
+								cout << " pdfFailure = " << mRec.pdfFailure  << endl;
+								cout << " transmittance = " << (mRec.transmittance).toString() << endl;
+								cout << "value: " << value.toString() << endl;
+								cout << endl;
+							}
+						}
 						Li += value;
 					}
 					break;

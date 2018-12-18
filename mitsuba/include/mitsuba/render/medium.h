@@ -60,6 +60,18 @@ public:
 	/// The medium's scattering coefficient at \ref p
 	Spectrum sigmaS;
 
+	// Tamar
+	/// The medium's density value at \ref p (density * scale)
+	Float beta;
+
+	// Tamar
+	// vector containing all the grid indexes that has a derivation value (contains in devVals)
+	std::vector<int> devIndxs;
+
+	// Tamar
+	// vector containing all the derivation values according to the indexes in devIndxs vector
+	std::vector<float> devVals;
+
 	/// Records the probability density of sampling a medium interaction at p
 	Float pdfSuccess;
 
@@ -150,6 +162,11 @@ public:
 	 */
 	virtual Spectrum evalTransmittance(const Ray &ray,
 		Sampler *sampler = NULL) const = 0;
+
+	// Tamar
+//	virtual int getDensityVolumeSize() const;
+
+	virtual void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay) const = 0;
 
 	/// Return the phase function of this medium
 	inline const PhaseFunction *getPhaseFunction() const { return m_phaseFunction.get(); }

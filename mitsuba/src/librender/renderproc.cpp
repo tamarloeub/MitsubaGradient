@@ -139,10 +139,13 @@ ref<WorkProcessor> BlockedRenderProcess::createWorkProcessor() const {
 			m_blockSize, m_borderSize, m_warnInvalid);
 }
 
-void BlockedRenderProcess::processResult(const WorkResult *result, bool cancelled) {
+void BlockedRenderProcess::processResult(const WorkResult *result, bool cancelled) {//, const WorkResult *result2, bool cancelled) {
+	// Tamar
 	const ImageBlock *block = static_cast<const ImageBlock *>(result);
+	//const ImageBlock *block2 = static_cast<const ImageBlock *>(result2);
 	UniqueLock lock(m_resultMutex);
-	m_film->put(block);
+	// Tamar
+	m_film->put(block);//, block2);
 	m_progress->update(++m_resultCount);
 	lock.unlock();
 	m_queue->signalWorkEnd(m_parent, block, cancelled);

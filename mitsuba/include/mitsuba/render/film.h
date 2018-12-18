@@ -49,7 +49,8 @@ public:
 	virtual void clear() = 0;
 
 	/// Merge an image block into the film
-	virtual void put(const ImageBlock *block) = 0;
+	// Tamar
+	virtual void put(const ImageBlock *block) = 0;//, const ImageBlock *block2) = 0;
 
 	/// Overwrite the film with the given bitmap and optionally multiply it by a scalar
 	virtual void setBitmap(const Bitmap *bitmap, Float multiplier = 1.0f) = 0;

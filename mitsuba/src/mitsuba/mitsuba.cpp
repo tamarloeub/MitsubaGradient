@@ -383,7 +383,12 @@ int mitsuba_app(int argc, char **argv) {
 			scene->setDestinationFile(destFile.length() > 0 ?
 				fs::path(destFile) : (filePath / baseName));
 			scene->setBlockSize(blockSize);
-
+			// Tamar
+			bool DEBUG_TAMAR = 0;
+			if (DEBUG_TAMAR){
+				cout << "test" << endl;
+				cout << scene->getFilm()->toString() << endl;
+			}
 			if (scene->destinationExists() && skipExisting)
 				continue;
 
