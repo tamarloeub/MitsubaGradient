@@ -667,6 +667,10 @@ Spectrum Scene::evalTransmittance(const Point &p1, bool p1OnSurface, const Point
 		bRec.typeMask = BSDF::ENull;
 		transmittance *= bsdf->eval(bRec, EDiscrete);
 
+		/* For periodic boundary conditions in X or Y
+		   'photons' reappear from the opposite faces of the domain */
+		if (medium && medium->getPeriodicRay(ray, its.t))
+			goto continue_raytracing;
 		if (its.isMediumTransition()) {
 			if (medium != its.getTargetMedium(-d)) {
 				++mediumInconsistencies;
@@ -682,6 +686,8 @@ Spectrum Scene::evalTransmittance(const Point &p1, bool p1OnSurface, const Point
 
 		ray.o = ray(its.t);
 		remaining -= its.t;
+
+continue_raytracing:
 		ray.maxt = remaining * lengthFactor;
 		ray.mint = Epsilon;
 	}

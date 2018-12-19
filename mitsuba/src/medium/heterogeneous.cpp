@@ -180,6 +180,21 @@ public:
 		EWoodcockTracking
 	};
 
+	/// Possible boundary condition options
+	enum EBoundaryCondition {
+		/**
+		 * \brief Open boundary: exiting 'photons' continue on
+		 * their path (for index matched boundary)
+		 */
+		EOpen = 0,
+
+		/**
+		 * \brief Periodic boundary: exiting 'photons' re-enter
+		 * the medium through the opposite face
+		 */
+		EPeriodic
+	};
+
 	HeterogeneousMedium(const Properties &props)
 		: Medium(props) {
 		m_stepSize = props.getFloat("stepSize", 0);
@@ -199,6 +214,21 @@ public:
 			m_method = ESimpsonQuadrature;
 		else
 			Log(EError, "Unsupported integration method \"%s\"!", method.c_str());
+		std::string xBoundary = boost::to_lower_copy(props.getString("xBoundary", "open"));
+		if (xBoundary == "open")
+			m_xBoundary = EOpen;
+		else if (xBoundary == "periodic")
+			m_xBoundary = EPeriodic;
+		else
+			Log(EError, "Unsupported X boundary condition \"%s\"!", xBoundary.c_str());
+
+		std::string yBoundary = boost::to_lower_copy(props.getString("yBoundary", "open"));
+		if (yBoundary == "open")
+			m_yBoundary = EOpen;
+		else if (yBoundary == "periodic")
+			m_yBoundary = EPeriodic;
+		else
+			Log(EError, "Unsupported Y boundary condition \"%s\"!", yBoundary.c_str());
 	}
 
 	/* Unserialize from a binary data stream */
@@ -210,6 +240,8 @@ public:
 		m_albedo = static_cast<VolumeDataSource *>(manager->getInstance(stream));
 		m_orientation = static_cast<VolumeDataSource *>(manager->getInstance(stream));
 		m_stepSize = stream->readFloat();
+		m_xBoundary = (EBoundaryCondition) stream->readInt();
+		m_yBoundary = (EBoundaryCondition) stream->readInt();
 		configure();
 	}
 
@@ -222,6 +254,8 @@ public:
 		manager->serialize(stream, m_albedo.get());
 		manager->serialize(stream, m_orientation.get());
 		stream->writeFloat(m_stepSize);
+		stream->writeInt(m_xBoundary);
+		stream->writeInt(m_yBoundary);
 	}
 
 	void configure() {
@@ -747,6 +781,43 @@ public:
 				mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 				mRec.orientation = m_orientation != NULL
 					? m_orientation->lookupVector(mRec.p) : Vector(0.0f);
+
+			} else if (m_xBoundary == EPeriodic || m_yBoundary == EPeriodic) {
+				/* For periodic boundary conditions in X or Y
+				   'photons' reappear from the opposite faces of the domain:
+				   loop until the photon exits through the top or bottom */
+
+				Float mint = ray.mint;
+				Float maxt = ray.maxt;
+				Float dummyFloat;
+				Ray newRay = Ray(ray);
+				Float totalIntegratedDensity = integratedDensity;
+				Float newDesiredDensity = desiredDensity - integratedDensity;
+
+				while (getPeriodicRay(newRay, maxt) && (newDesiredDensity > 1e-6f)) {
+
+					if (!m_densityAABB.rayIntersect(newRay, mint, maxt))
+						Log(EError, "Intersection with the medium's bounding box for "
+									"periodic boundary conditions wasn't found");
+
+					newRay.mint = 0;
+					newRay.maxt = maxt;
+
+					if (invertDensityIntegral(newRay, newDesiredDensity, integratedDensity,
+							mRec.t, dummyFloat, densityAtT)) {
+						mRec.p = newRay(mRec.t);
+						success = true;
+						Spectrum albedo = m_albedo->lookupSpectrum(mRec.p);
+						mRec.sigmaS = albedo * densityAtT;
+						mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
+						mRec.orientation = m_orientation != NULL
+							? m_orientation->lookupVector(mRec.p) : Vector(0.0f);
+					}
+
+					totalIntegratedDensity += integratedDensity;
+					newDesiredDensity -= integratedDensity;
+				}
+				integratedDensity = totalIntegratedDensity;
 			}
 
 			Float expVal = math::fastexp(-integratedDensity);
@@ -756,6 +827,10 @@ public:
 			mRec.transmittance = Spectrum(expVal);
 			mRec.time = ray.time;
 		} else {
+			/* TODO: Add periodic boundary support for woodcock-tracking. */
+			if (m_xBoundary == EPeriodic || m_yBoundary == EPeriodic)
+				Log(EError, "Currently woodcock + periodic boundary is not supported.");
+
 			/* The following information is invalid when
 			   using Woodcock-tracking */
 			mRec.pdfFailure = 1.0f;
@@ -861,7 +936,9 @@ public:
 			<< "  albedo = " << indent(m_albedo.toString()) << "," << endl
 			<< "  orientation = " << indent(m_orientation.toString()) << "," << endl
 			<< "  stepSize = " << m_stepSize << "," << endl
-			<< "  scale = " << m_scale << endl
+			<< "  scale = " << m_scale << "," << endl
+			<< "  xBoundary = " << (m_xBoundary == EOpen ? "open" : "periodic") << "," << endl
+			<< "  yBoundary = " << (m_yBoundary == EOpen ? "open" : "periodic") << endl
 			<< "]";
 		return oss.str();
 	}
@@ -879,8 +956,47 @@ protected:
 		}
 		return density;
 	}
+
+	/* TODO: Move to Medium for homogeneous periodic */
+	bool getPeriodicRay(Ray &ray, Float t) const {
+		/* If the ray ("photon") is exiting one of the faces with periodic boundary conditions,
+		 * it will be periodically enter from the opposite face and return True.
+		 * return False for a Ray exiting a non-periodic boundary face */
+
+		EBoundaryCondition boundaryArray[3] = {m_xBoundary, m_yBoundary, EOpen};
+
+		/* If ray(t) is not finite it is because the ray hit the corner/edge of the domain.
+		 * In this case we keep the same origin and check periodicity */
+		if (std::isfinite(ray(t).x) && std::isfinite(ray(t).y) && std::isfinite(ray(t).z))
+			ray.o = ray(t);
+
+		/* For each pair of AABB planes check exiting direction. Check top/bottom first
+		 * because then there is no need to check periodicity of XY faces */
+		for (int i = 3; i --> 0; ) {
+			Float origin = ray.o[i], direction = ray.d[i];
+			Float minVal = m_densityAABB.min[i], maxVal = m_densityAABB.max[i];
+
+			/* Calculate distances */
+			Float minDist = std::abs(minVal - origin);
+			Float maxDist = std::abs(maxVal - origin);
+
+			if (minDist < 1e-6f && direction < 0.0)
+				if (boundaryArray[i] == EPeriodic)
+					ray.o[i] = maxVal;
+				else
+					return false;
+			else if (maxDist < 1e-6f && direction > 0.0)
+				if (boundaryArray[i] == EPeriodic)
+					ray.o[i] = minVal;
+				else
+					return false;
+		}
+		return true;
+	}
 protected:
 	EIntegrationMethod m_method;
+	EBoundaryCondition m_xBoundary;
+	EBoundaryCondition m_yBoundary;
 	ref<VolumeDataSource> m_density;
 	ref<VolumeDataSource> m_albedo;
 	ref<VolumeDataSource> m_orientation;
