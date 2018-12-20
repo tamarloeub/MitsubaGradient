@@ -680,6 +680,7 @@ void export_render() {
         .def("getSigmaS", &Medium::getSigmaS, BP_RETURN_VALUE)
         .def("getSigmaT", &Medium::getSigmaT, BP_RETURN_VALUE)
         .def("isHomogeneous", &Medium::isHomogeneous);
+
 	void (ProjectiveCamera::*projectiveCamera_setWorldTransform1)(const Transform &) = &ProjectiveCamera::setWorldTransform;
 	void (ProjectiveCamera::*projectiveCamera_setWorldTransform2)(AnimatedTransform *) = &ProjectiveCamera::setWorldTransform;
 	const Transform (ProjectiveCamera::*projectiveCamera_getWorldTransform1)(Float t) const = &ProjectiveCamera::getWorldTransform;

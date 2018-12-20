@@ -78,9 +78,9 @@ Spectrum SamplingIntegrator::E(const Scene *scene, const Intersection &its,
 			Vector d = frame.toWorld(warp::squareToCosineHemisphere(query.nextSample2D()));
 			++query.depth;
 			query.medium = medium;
-			std::vector<Spectrum> Smk;
+			std::vector<Spectrum> Smk = scene->getSmk();
 			cout << "SamplingIntegrator::E" << endl; //Tamar
-			E += Li(RayDifferential(its.p, d, its.time), query, Smk) * M_PI;
+			E += Li(RayDifferential(its.p, d, its.time), query, Smk, false) * M_PI;
 		}
 
 		sampler->advance();
@@ -168,15 +168,8 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 
 		sampler->generate(offset);
 		//build Smk
-		int gridSize = 8;
-//		if (rRec.medium->isHomogeneous() == false)
-//			int gridSize = 8;//rRec.medium->getDensityVolumeSize();
-		cout << gridSize << endl;
-//		scene->getSmk()
-//		std::vector<Spectrum> Smk = rRec.scene->getSmk();//(gridSize);
+		std::vector<Spectrum> Smk = rRec.scene->getSmk();
 
-		std::vector<Spectrum>  Smk(gridSize);
-		std::fill(Smk.begin(), Smk.end(), Spectrum(0.0f));
 		for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
 			cout << "Smk at " << i << " = " << Smk[i].toString() << endl;
 		}
@@ -195,12 +188,22 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 
 			sensorRay.scaleDifferential(diffScaleFactor);
 
-			spec *= Li(sensorRay, rRec, Smk);
-			if (j < 100){
+			bool print_out = true;
+//			if (j < 10)
+//				print_out = true;
+//			else
+//				print_out = false;
+
+			if (print_out){
+				cout << endl;
+				cout << "sample " << j << endl;
+			}
+
+			spec *= Li(sensorRay, rRec, Smk, print_out);
+			if (print_out){
 				for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
 					if (i == 0) {
-						cout << endl;
-						cout << "sample " << j << endl;
+						cout << "spec = " << spec.toString() << endl;
 					}
 					cout << "Smk at " << i << " = " << Smk[i].toString() << endl;
 				}

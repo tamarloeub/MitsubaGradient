@@ -85,7 +85,7 @@ public:
 	SimpleVolumetricPathTracer(Stream *stream, InstanceManager *manager)
 	 : MonteCarloIntegrator(stream, manager) { }
 
-	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk) const {
+	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk, bool print_out) const {
 		/* Some aliases and local variables */
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;
@@ -126,6 +126,13 @@ public:
 				/* Sample the integral
 				   \int_x^y tau(x, x') [ \sigma_s \int_{S^2} \rho(\omega,\omega') L(x,\omega') d\omega' ] dx'
 				*/
+//				if (true) {
+//					cout <<  "size of mRec.devVals = " << mRec.devVals.size() << endl;
+//					for(std::vector<int>::size_type i = 0; i != mRec.devVals.size(); i++) {
+//					    cout << "mRec.derivative[" << mRec.devIndxs[i] << "] = "
+//					    		<< mRec.devVals[i] << endl;
+//					}
+//				}
 
 				if (DEBUG_TAMAR) {
 					cout << ray.toString();
@@ -143,7 +150,15 @@ public:
 				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 				// build Smk
 				for(std::vector<int>::size_type i = 0; i != mRec.devIndxs.size(); i++) {
+					if (print_out) {
+						cout << "Ray:" << endl;
+						cout << "mRec.devVals[" << i << "] = " << mRec.devVals[i] << " at index " << mRec.devIndxs[i] << endl;
+						cout << Smk[mRec.devIndxs[i]].toString() << endl;
+					}
+
 					Smk[mRec.devIndxs[i]] += throughput * mRec.devVals[i];
+					if (print_out)
+						cout << Smk[mRec.devIndxs[i]].toString() << endl;
 				}
 				// Tamar
 //				throughput_grad *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
@@ -169,7 +184,13 @@ public:
 						RayDifferential rayD = RayDifferential(mRec.p, mRec.orientation ,mRec.time);
 						rRec.medium->derivateDensity(rayD, mdRec, true);
 						for(std::vector<int>::size_type i = 0; i != mdRec.devIndxs.size(); i++) {
+							if (print_out) {
+								cout << "LE:" << endl;
+								cout << Smk[mRec.devIndxs[i]].toString() << endl;
+							}
 							Smk[mdRec.devIndxs[i]] += throughput * mdRec.devVals[i] * phaseVal;
+							if (print_out)
+								cout << Smk[mRec.devIndxs[i]].toString() << endl;
 						}
 
 					}

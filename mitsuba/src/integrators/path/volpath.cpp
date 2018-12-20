@@ -81,7 +81,7 @@ public:
 	VolumetricPathTracer(Stream *stream, InstanceManager *manager)
 	 : MonteCarloIntegrator(stream, manager) { }
 
-	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk) const {
+	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk, bool print_out) const {
 		/* Some aliases and local variables */
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;

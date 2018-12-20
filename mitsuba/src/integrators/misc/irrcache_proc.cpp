@@ -110,6 +110,7 @@ public:
 					   rotational + translational gradients */
 					m_hs->generateDirections(its);
 					m_sampler->generate(Point2i(0));
+					std::vector<Spectrum> Smk = m_scene->getSmk();
 
 					for (unsigned int j=0; j<m_hs->getM(); j++) {
 						for (unsigned int k=0; k<m_hs->getN(); k++) {
@@ -119,8 +120,7 @@ public:
 								| RadianceQueryRecord::EDistance, m_sensor->getMedium());
 							rRec.extra = RadianceQueryRecord::ECacheQuery;
 							rRec.depth = 2;
-							std::vector<Spectrum> Smk;
-							entry.L = integrator->Li(RayDifferential(its.p, entry.d, 0.0f), rRec, Smk);
+							entry.L = integrator->Li(RayDifferential(its.p, entry.d, 0.0f), rRec, Smk, false);
 							entry.dist = rRec.dist;
 							m_sampler->advance();
 						}

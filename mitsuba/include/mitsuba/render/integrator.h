@@ -319,7 +319,7 @@ public:
 	 * a radiance query record, which makes this request more precise.
 	 */
 	virtual Spectrum Li(const RayDifferential &ray,
-		RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk) const = 0;
+		RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk, bool print_out) const = 0;
 
 	/**
 	 * \brief Estimate the irradiance at a given surface point

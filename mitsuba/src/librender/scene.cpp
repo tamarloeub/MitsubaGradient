@@ -34,6 +34,11 @@ Scene::Scene()
 	m_kdtree = new ShapeKDTree();
 	m_sourceFile = new fs::path();
 	m_destinationFile = new fs::path();
+
+	// Tamar
+	int gridSize = 8;
+	m_Smk.resize(gridSize);
+	std::fill(m_Smk.begin(), m_Smk.end(), Spectrum(0.0f));
 }
 
 Scene::Scene(const Properties &props)
@@ -78,6 +83,10 @@ Scene::Scene(const Properties &props)
 		m_kdtree->setMaxBadRefines(props.getInteger("kdMaxBadRefines"));
 	m_sourceFile = new fs::path();
 	m_destinationFile = new fs::path();
+	// Tamar
+	int gridSize = 8;
+	m_Smk.resize(gridSize);
+	std::fill(m_Smk.begin(), m_Smk.end(), Spectrum(0.0f));
 }
 
 Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
@@ -101,6 +110,10 @@ Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
 	m_specialShapes = scene->m_specialShapes;
 	m_degenerateSensor = scene->m_degenerateSensor;
 	m_degenerateEmitters = scene->m_degenerateEmitters;
+	// Tamar
+	int gridSize = 8;
+	m_Smk.resize(gridSize);
+	std::fill(m_Smk.begin(), m_Smk.end(), Spectrum(0.0f));
 }
 
 Scene::Scene(Stream *stream, InstanceManager *manager)
@@ -160,6 +173,10 @@ Scene::Scene(Stream *stream, InstanceManager *manager)
 	m_netObjects.reserve(count);
 	for (size_t i=0; i<count; ++i)
 		m_netObjects.push_back(static_cast<NetworkedObject *>(manager->getInstance(stream)));
+	// Tamar
+	int gridSize = 8;
+	m_Smk.resize(gridSize);
+	std::fill(m_Smk.begin(), m_Smk.end(), Spectrum(0.0f));
 
 	initialize();
 }
@@ -667,10 +684,11 @@ Spectrum Scene::evalTransmittance(const Point &p1, bool p1OnSurface, const Point
 		bRec.typeMask = BSDF::ENull;
 		transmittance *= bsdf->eval(bRec, EDiscrete);
 
-		/* For periodic boundary conditions in X or Y
-		   'photons' reappear from the opposite faces of the domain */
-		if (medium && medium->getPeriodicRay(ray, its.t))
-			goto continue_raytracing;
+	// periodic
+//		/* For periodic boundary conditions in X or Y
+//		   'photons' reappear from the opposite faces of the domain */
+//		if (medium && medium->getPeriodicRay(ray, its.t))
+//			goto continue_raytracing;
 		if (its.isMediumTransition()) {
 			if (medium != its.getTargetMedium(-d)) {
 				++mediumInconsistencies;
@@ -687,7 +705,7 @@ Spectrum Scene::evalTransmittance(const Point &p1, bool p1OnSurface, const Point
 		ray.o = ray(its.t);
 		remaining -= its.t;
 
-continue_raytracing:
+//continue_raytracing:
 		ray.maxt = remaining * lengthFactor;
 		ray.mint = Epsilon;
 	}

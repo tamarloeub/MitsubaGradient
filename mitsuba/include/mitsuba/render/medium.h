@@ -205,7 +205,8 @@ public:
 	/// Return a string representation
 	virtual std::string toString() const = 0;
 
-	virtual bool getPeriodicRay(Ray &ray, Float t) const = 0;
+	// periodic
+	//virtual bool getPeriodicRay(Ray &ray, Float t) const = 0;
 	//! @}
 	// =============================================================
 
