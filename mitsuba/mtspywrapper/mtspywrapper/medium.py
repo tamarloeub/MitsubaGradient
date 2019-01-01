@@ -44,23 +44,6 @@ class pyMedium(object):
         })
         return bounding_box
         
-        
-    def set_boundary(self, x='open', y='open'):
-        """ 
-        Set boundary conditions to open / periodic
-        Input
-          x: 'open' / 'periodic' 
-          y: 'open' / 'periodic'
-        """
-        self.__x_boundary = x
-        self.__y_boundary = y
-    
-    def get_boundary(self):
-        """ 
-        Output boundary conditions of (x, y)
-        """
-        return (self.__x_boundary, self.__y_boundary)
-        
     def set_single_scattering_albedo(self, ssa):
         self.__single_scattering_albedo = Spectrum(ssa)
         
@@ -185,8 +168,32 @@ class pyMedium(object):
         
     def get_mitsuba_density(self):
         return self.__mitsuba_density
-    
-    @property 
+
+    def set_boundary(self, x='open', y='open'):
+        """
+        Set boundary conditions to open / periodic
+        Input
+          x: 'open' / 'periodic'
+          y: 'open' / 'periodic'
+        """
+        self.__x_boundary = x
+        self.__y_boundary = y
+
+    def get_boundary(self):
+        """
+        Output boundary conditions of (x, y)
+        """
+        return (self.__x_boundary, self.__y_boundary)
+
+    @property
+    def x_boundary(self):
+        return self.__x_boundary
+
+    @property
+    def y_boundary(self):
+        return self.__y_boundary
+
+    @property
     def filename(self):
         return self.__filename 
     
@@ -197,15 +204,7 @@ class pyMedium(object):
     @property
     def single_scattering_albedo(self):
         return self.__single_scattering_albedo  
-    
-    @property
-    def x_boundary(self):
-        return self.__x_boundary
 
-    @property
-    def y_boundary(self):
-        return self.__y_boundary
-      
     @property
     def ndim(self):
         return '{}D'.format(self.__ndim)
@@ -227,4 +226,4 @@ class pyMedium(object):
             
     def __del__(self):
         unlink(self.__filename)
-        assert not path.exists(self.filename)    
+        assert not path.exists(self.filename)

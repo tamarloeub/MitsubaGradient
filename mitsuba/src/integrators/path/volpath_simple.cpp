@@ -150,14 +150,14 @@ public:
 				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 				// build Smk
 				for(std::vector<int>::size_type i = 0; i != mRec.devIndxs.size(); i++) {
-					if (print_out) {
+					if ((print_out) and (DEBUG_TAMAR)) {
 						cout << "Ray:" << endl;
 						cout << "mRec.devVals[" << i << "] = " << mRec.devVals[i] << " at index " << mRec.devIndxs[i] << endl;
 						cout << Smk[mRec.devIndxs[i]].toString() << endl;
 					}
 
 					Smk[mRec.devIndxs[i]] += throughput * mRec.devVals[i];
-					if (print_out)
+					if ((print_out) and (DEBUG_TAMAR))
 						cout << Smk[mRec.devIndxs[i]].toString() << endl;
 				}
 				// Tamar

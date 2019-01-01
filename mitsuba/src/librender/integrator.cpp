@@ -161,6 +161,8 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 	if (!sensor->getFilm()->hasAlpha()) /* Don't compute an alpha channel if we don't have to */
 		queryType &= ~RadianceQueryRecord::EOpacity;
 
+	bool DEBUG_TAMAR = 0;
+
 	for (size_t i = 0; i<points.size(); ++i) {
 		Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
 		if (stop)
@@ -170,8 +172,10 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 		//build Smk
 		std::vector<Spectrum> Smk = rRec.scene->getSmk();
 
-		for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
-			cout << "Smk at " << i << " = " << Smk[i].toString() << endl;
+		if (DEBUG_TAMAR) {
+			for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
+				cout << "Smk at " << i << " = " << Smk[i].toString() << endl;
+			}
 		}
 
 		for (size_t j = 0; j<sampler->getSampleCount(); j++) {
@@ -188,19 +192,19 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 
 			sensorRay.scaleDifferential(diffScaleFactor);
 
-			bool print_out = true;
-//			if (j < 10)
-//				print_out = true;
-//			else
-//				print_out = false;
+			bool print_out = false;
+			if (j < 10)
+				print_out = true;
+			else
+				print_out = false;
 
-			if (print_out){
+			if ((print_out) and (DEBUG_TAMAR)){
 				cout << endl;
 				cout << "sample " << j << endl;
 			}
 
 			spec *= Li(sensorRay, rRec, Smk, print_out);
-			if (print_out){
+			if ((print_out) and (DEBUG_TAMAR)){
 				for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
 					if (i == 0) {
 						cout << "spec = " << spec.toString() << endl;
@@ -210,7 +214,6 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			}
 			block->put(samplePos, spec, rRec.alpha);
 
-			bool DEBUG_TAMAR = 0;
 			if (DEBUG_TAMAR) {
 				cout << endl;
 				cout << "samplePos "<< j << " = (" << samplePos[0] << ", " << samplePos[1] << ")" << endl;

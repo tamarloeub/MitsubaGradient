@@ -402,7 +402,9 @@ void export_render() {
 		.def("getMeshes", &scene_getMeshes)
 		.def("getEmitters", &scene_getEmitters)
 		.def("getMedia", &scene_getMedia)
-		.def("getKDTree", scene_getKDTree, BP_RETURN_VALUE);
+		.def("getKDTree", scene_getKDTree, BP_RETURN_VALUE)
+		// Tamar
+		.def("__repr__", &Scene::toString);
 
 	BP_CLASS(Sampler, ConfigurableObject, bp::no_init)
 		.def("clone", &Sampler::clone, BP_RETURN_VALUE)
@@ -679,7 +681,9 @@ void export_render() {
         .def("getSigmaA", &Medium::getSigmaA, BP_RETURN_VALUE)
         .def("getSigmaS", &Medium::getSigmaS, BP_RETURN_VALUE)
         .def("getSigmaT", &Medium::getSigmaT, BP_RETURN_VALUE)
-        .def("isHomogeneous", &Medium::isHomogeneous);
+        .def("isHomogeneous", &Medium::isHomogeneous)
+        // Tamar
+		.def("__repr__", &Medium::toString);
 
 	void (ProjectiveCamera::*projectiveCamera_setWorldTransform1)(const Transform &) = &ProjectiveCamera::setWorldTransform;
 	void (ProjectiveCamera::*projectiveCamera_setWorldTransform2)(AnimatedTransform *) = &ProjectiveCamera::setWorldTransform;
