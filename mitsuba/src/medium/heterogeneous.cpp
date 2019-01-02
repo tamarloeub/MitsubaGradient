@@ -960,7 +960,7 @@ public:
 			<< "  albedo = " << indent(m_albedo.toString()) << "," << endl
 			<< "  orientation = " << indent(m_orientation.toString()) << "," << endl
 			<< "  stepSize = " << m_stepSize << "," << endl
-			<< "  scale = " << m_scale << endl
+			<< "  scale = " << m_scale << "," << endl
 			// periodic
 			<< "  xBoundary = " << (m_xBoundary == EOpen ? "open" : "periodic") << "," << endl
 			<< "  yBoundary = " << (m_yBoundary == EOpen ? "open" : "periodic") << endl
