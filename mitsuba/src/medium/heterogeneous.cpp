@@ -325,7 +325,7 @@ public:
 ////		return m_density->getVolumeSize();
 //	}
 
-	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay) const {
+	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out) const {
 		// int* volSize = m_density->getVolumeSizeVec();
 		// cout << volSize << endl;
 		// Float devDensity = new Float[volSize[0]][volSize[1]][volSize[2]];
@@ -355,8 +355,9 @@ public:
 		const Float stepSize = length/nSteps;
 		const Vector increment = ray.d * stepSize;
 
-		bool DEBUG_TAMAR = 0;
-		if (DEBUG_TAMAR){
+//		bool DEBUG_TAMAR = 1;
+		bool DEBUG_TAMAR = print_out;
+		if ((DEBUG_TAMAR) and (print_out)) {
 			cout << endl;
 			cout << "derivate grid:" << endl;
 			cout << endl;
@@ -384,9 +385,9 @@ public:
 
 		p += increment;
 
-		if (DEBUG_TAMAR){
-			cout << "p curr = " << p.toString() << endl;
-		}
+//		if ((DEBUG_TAMAR) and (print_out)) {
+//			cout << "p curr = " << p.toString() << endl;
+//		}
 		std::vector<float> inDev(8); // vector contains the value of the 8'th grid derivations value
 		std::vector<int>   inIndxs(8); // vector contains the indexes of the 8'th grid points
 
@@ -396,12 +397,12 @@ public:
 			std::fill(inDev.begin(), inDev.end(), 0);
 			std::fill(inIndxs.begin(), inIndxs.end(), 0);
 			
-			if (DEBUG_TAMAR){
-				cout << "inner Dev struct:" << inDev.at(0) << endl;
-				cout << "inner indxs struct:" << inIndxs.at(0) << endl;
-			}
+//			if (DEBUG_TAMAR){
+//				cout << "inner Dev struct:" << inDev.at(0) << endl;
+//				cout << "inner indxs struct:" << inIndxs.at(0) << endl;
+//			}
 
-			m_density->gridDerivative(p, inDev, inIndxs);
+			m_density->gridDerivative(p, inDev, inIndxs, print_out);
 
 			for(std::vector<int>::size_type j = 0; j != inDev.size(); j++) {
 				if (std::isnan(inDev[j])){
@@ -411,11 +412,12 @@ public:
 			}
 
 			if (DEBUG_TAMAR){
+				cout << "p curr = " << p.toString() << " step = " << i << endl;
 				for(std::vector<int>::size_type j = 0; j != inDev.size(); j++) {
-					cout << "inDev.at(" << "j" << ") = " << inDev.at(j) << endl;
+					cout << "inDev.at(" << j << ") = " << inDev.at(j) << endl;
 				}
 				cout << endl;
-				cout << "p curr = " << p.toString() << endl;
+
 			}
 
 			// update medium recored
@@ -787,10 +789,11 @@ public:
 	}
 
 	bool sampleDistance(const Ray &ray, MediumSamplingRecord &mRec,
-			Sampler *sampler) const {
+			Sampler *sampler, bool print_out) const {
 		Float integratedDensity, densityAtMinT, densityAtT;
 		bool success = false;
-		bool DEBUG_TAMAR = 0;
+//		bool DEBUG_TAMAR = 1;
+		bool DEBUG_TAMAR = print_out;
 
 		if (m_method == ESimpsonQuadrature) {
 			Float desiredDensity = -math::fastlog(1-sampler->next1D());
@@ -850,9 +853,9 @@ public:
 			mRec.pdfSuccessRev = expVal * densityAtMinT;
 			mRec.transmittance = Spectrum(expVal);
 			mRec.time = ray.time;
-		} else { // periodic			
+		} else {
 			/* TODO: Add periodic boundary support for woodcock-tracking. */
-			if (m_xBoundary == EPeriodic || m_yBoundary == EPeriodic)
+			if (m_xBoundary == EPeriodic || m_yBoundary == EPeriodic)// periodic
 				Log(EError, "Currently woodcock + periodic boundary is not supported.");
 
 			/* The following information is invalid when
@@ -899,10 +902,14 @@ public:
 						? m_orientation->lookupVector(p) : Vector(0.0f);
 
 					// Tamar
-					derivateDensity(ray, mRec, false);
+					if (print_out)
+						cout << ray.toString() << endl;
 
-					if (DEBUG_TAMAR) {
+					derivateDensity(ray, mRec, false, print_out);
+
+					if ((DEBUG_TAMAR) and (print_out)) {
 						cout << "sample dist:" << endl;
+						cout << "point in space : (" << p[0] << ", " << p[1] << ", " << p[2] << ")" << endl;
 						cout <<  "size of mRec.devVals = " << mRec.devVals.size() << endl;
 						for(std::vector<int>::size_type i = 0; i != mRec.devVals.size(); i++) {
 						    cout << "mRec.derivative[" << mRec.devIndxs[i] << "] = "

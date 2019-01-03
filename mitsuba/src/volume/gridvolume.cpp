@@ -406,7 +406,7 @@ public:
 	}
 
 	//Tamar
-	void gridDerivative(const Point &_p, std::vector<float> &innerDev, std::vector<int> &devIndxs) const {
+	void gridDerivative(const Point &_p, std::vector<float> &innerDev, std::vector<int> &devIndxs, bool print_out) const {
 		bool DEBUG_TAMAR = 0;
 		if (DEBUG_TAMAR) {
 			cout << "gridDerivative():" << endl;
@@ -419,6 +419,12 @@ public:
 			  y1 = math::floorToInt(p.y),
 			  z1 = math::floorToInt(p.z),
 			  x2 = x1+1, y2 = y1+1, z2 = z1+1;
+		if (print_out) {
+			cout << "point _p = (" << _p.x << ", " << _p.y << ", " << _p.z << ")" << endl;
+			cout << "point p = (" << p.x << ", " << p.y << ", " << p.z << ")" << endl;
+			cout << "(x1, y1, z1) = (" << x1 << ", " << y1 << ", " << z1 << ")" << endl;
+			cout << "(x2, y2, z2) = (" << x2 << ", " << y2 << ", " << z2 << ")" << endl;
+		}
 
 		if (x1 < 0 || y1 < 0 || z1 < 0 || x2 >= m_res.x ||
 			y2 >= m_res.y || z2 >= m_res.z)

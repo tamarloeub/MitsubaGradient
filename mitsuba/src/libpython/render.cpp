@@ -403,6 +403,7 @@ void export_render() {
 		.def("getEmitters", &scene_getEmitters)
 		.def("getMedia", &scene_getMedia)
 		.def("getKDTree", scene_getKDTree, BP_RETURN_VALUE)
+		.def("getSmk", &Scene::getSmk, BP_RETURN_VALUE)
 		// Tamar
 		.def("__repr__", &Scene::toString);
 

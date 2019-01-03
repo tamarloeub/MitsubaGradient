@@ -50,7 +50,7 @@ Float VolumeDataSource::lookupFloat(const Point &p) const {
 //}
 
 // Tamar
-void VolumeDataSource::gridDerivative(const Point &_p, std::vector<float> &innerDev, std::vector<int> &devIndxs) const {
+void VolumeDataSource::gridDerivative(const Point &_p, std::vector<float> &innerDev, std::vector<int> &devIndxs, bool print_out) const {
 	Log(EError, "'%s': does not implement gridDerivative()!", getClass()->getName().c_str());
 	return;
 }

@@ -50,7 +50,7 @@ public:
 
 	// Tamar
 	/// return grid derivative at position p
-	virtual void gridDerivative(const Point &_p, std::vector<float> &innerDev, std::vector<int> &devIndxs) const;
+	virtual void gridDerivative(const Point &_p, std::vector<float> &innerDev, std::vector<int> &devIndxs, bool print_out) const;
 
 	/// Are spectrum-valued lookups permitted?
 	virtual bool supportsSpectrumLookups() const;

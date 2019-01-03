@@ -273,7 +273,7 @@ public:
 	}
 
 	bool sampleDistance(const Ray &ray, MediumSamplingRecord &mRec,
-			Sampler *sampler) const {
+			Sampler *sampler, bool print_out) const {
 		Float rand = sampler->next1D(), sampledDistance;
 		Float samplingDensity = m_samplingDensity;
 
@@ -405,7 +405,7 @@ public:
 //		return 0;
 //	}
 
-	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay) const {
+	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out) const {
 		Log(EError, "Homogeneous Medium: does not implement gridDerivative()!");
 		return;
 	}

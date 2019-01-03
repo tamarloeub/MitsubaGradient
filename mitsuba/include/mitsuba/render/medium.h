@@ -130,7 +130,7 @@ public:
 	 *                 no interaction inside the medium could be sampled.
 	 */
 	virtual bool sampleDistance(const Ray &ray,
-		MediumSamplingRecord &mRec, Sampler *sampler) const = 0;
+		MediumSamplingRecord &mRec, Sampler *sampler, bool print_out) const = 0;
 
 	/**
 	 * \brief Compute the 1D density of sampling distance \a ray.maxt
@@ -166,7 +166,7 @@ public:
 	// Tamar
 //	virtual int getDensityVolumeSize() const;
 
-	virtual void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay) const = 0;
+	virtual void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out) const = 0;
 
 	/// Return the phase function of this medium
 	inline const PhaseFunction *getPhaseFunction() const { return m_phaseFunction.get(); }

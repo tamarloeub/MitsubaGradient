@@ -113,7 +113,8 @@ public:
 		 */
 
 		/* debug */
-		bool DEBUG_TAMAR = 0;
+//		bool DEBUG_TAMAR = 1;
+		bool DEBUG_TAMAR = print_out;
 		if (DEBUG_TAMAR)
 			cout << "start:" << endl;
 
@@ -122,11 +123,11 @@ public:
 			/*                 Radiative Transfer Equation sampling                 */
 			/* ==================================================================== */
 
-			if (rRec.medium && rRec.medium->sampleDistance(Ray(ray, 0, its.t), mRec, rRec.sampler)) {
+			if (rRec.medium && rRec.medium->sampleDistance(Ray(ray, 0, its.t), mRec, rRec.sampler, print_out)) {
 				/* Sample the integral
 				   \int_x^y tau(x, x') [ \sigma_s \int_{S^2} \rho(\omega,\omega') L(x,\omega') d\omega' ] dx'
 				*/
-//				if (true) {
+//				if (DEBUG_TAMAR) {
 //					cout <<  "size of mRec.devVals = " << mRec.devVals.size() << endl;
 //					for(std::vector<int>::size_type i = 0; i != mRec.devVals.size(); i++) {
 //					    cout << "mRec.derivative[" << mRec.devIndxs[i] << "] = "
@@ -150,16 +151,20 @@ public:
 				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 				// build Smk
 				for(std::vector<int>::size_type i = 0; i != mRec.devIndxs.size(); i++) {
-					if ((print_out) and (DEBUG_TAMAR)) {
-						cout << "Ray:" << endl;
-						cout << "mRec.devVals[" << i << "] = " << mRec.devVals[i] << " at index " << mRec.devIndxs[i] << endl;
-						cout << Smk[mRec.devIndxs[i]].toString() << endl;
-					}
+//					if ((print_out) and (DEBUG_TAMAR)) {
+//						cout << "Ray:" << endl;
+//						cout << "mRec.devVals[" << i << "] = " << mRec.devVals[i] << " at index " << mRec.devIndxs[i] << endl;
+//						cout << Smk[mRec.devIndxs[i]].toString() << endl;
+//					}
 
 					Smk[mRec.devIndxs[i]] += throughput * mRec.devVals[i];
-					if ((print_out) and (DEBUG_TAMAR))
-						cout << Smk[mRec.devIndxs[i]].toString() << endl;
 				}
+				if ((print_out) and (DEBUG_TAMAR)) {
+					for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
+						cout << "Smk at " << i << " = " << Smk[i].toString() << endl;
+					}
+				}
+
 				// Tamar
 //				throughput_grad *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 
@@ -182,7 +187,7 @@ public:
 						Li += throughput * value * phaseVal;
 						MediumSamplingRecord mdRec;
 						RayDifferential rayD = RayDifferential(mRec.p, mRec.orientation ,mRec.time);
-						rRec.medium->derivateDensity(rayD, mdRec, true);
+						rRec.medium->derivateDensity(rayD, mdRec, true, print_out);
 						for(std::vector<int>::size_type i = 0; i != mdRec.devIndxs.size(); i++) {
 							if (print_out) {
 								cout << "LE:" << endl;
@@ -224,8 +229,8 @@ public:
 					tau(x, y) * (Surface integral). This happens with probability mRec.pdfFailure
 					Account for this and multiply by the proper per-color-channel transmittance.
 				*/
-				if (DEBUG_TAMAR)
-					cout << ray.toString();
+//				if (DEBUG_TAMAR)
+//					cout << ray.toString();
 
 				if (rRec.medium)
 					throughput *= mRec.transmittance / mRec.pdfFailure;

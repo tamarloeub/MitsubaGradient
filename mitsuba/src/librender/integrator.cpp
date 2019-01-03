@@ -19,8 +19,12 @@
 #include <mitsuba/core/statistics.h>
 #include <mitsuba/render/integrator.h>
 #include <mitsuba/render/renderproc.h>
+#include <iostream>
+#include <fstream>
 
 MTS_NAMESPACE_BEGIN
+
+//using namespace std;
 
 Integrator::Integrator(const Properties &props)
  : NetworkedObject(props) { }
@@ -164,6 +168,7 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 	bool DEBUG_TAMAR = 0;
 
 	for (size_t i = 0; i<points.size(); ++i) {
+		cout << "pointsize = " << points.size() << endl;
 		Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
 		if (stop)
 			break;
@@ -193,10 +198,14 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			sensorRay.scaleDifferential(diffScaleFactor);
 
 			bool print_out = false;
-			if (j < 10)
+			if ((j == sampler->getSampleCount() - 1)) { // || (j == 2)) {
 				print_out = true;
-			else
+				DEBUG_TAMAR = true;
+			} else {
 				print_out = false;
+				DEBUG_TAMAR = false;
+			}
+
 
 			if ((print_out) and (DEBUG_TAMAR)){
 				cout << endl;
@@ -204,17 +213,22 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			}
 
 			spec *= Li(sensorRay, rRec, Smk, print_out);
+
+			std::ofstream myfile; //redirect Smk to file
+			myfile.open("output.txt"); //redirect Smk to file
 			if ((print_out) and (DEBUG_TAMAR)){
 				for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
 					if (i == 0) {
 						cout << "spec = " << spec.toString() << endl;
 					}
-					cout << "Smk at " << i << " = " << Smk[i].toString() << endl;
+					myfile << "Smk at " << i << " = " << Smk[i].toString() << endl; //redirect Smk to file
 				}
 			}
+			myfile.close(); //redirect Smk to file
+
 			block->put(samplePos, spec, rRec.alpha);
 
-			if (DEBUG_TAMAR) {
+			if ((print_out) and (DEBUG_TAMAR)) {
 				cout << endl;
 				cout << "samplePos "<< j << " = (" << samplePos[0] << ", " << samplePos[1] << ")" << endl;
 				cout << "value "<< spec.toString() << endl;
@@ -222,6 +236,7 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			}
 			sampler->advance();
 		}
+
 	}
 }
 
