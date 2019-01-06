@@ -37,8 +37,8 @@ Scene::Scene()
 
 	// Tamar
 	int gridSize = 8;
-	m_Smk.resize(gridSize);
-	std::fill(m_Smk.begin(), m_Smk.end(), Spectrum(0.0f));
+	m_densityDerivative.resize(gridSize);
+	std::fill(m_densityDerivative.begin(), m_densityDerivative.end(), Spectrum(0.0f));
 }
 
 Scene::Scene(const Properties &props)
@@ -85,8 +85,8 @@ Scene::Scene(const Properties &props)
 	m_destinationFile = new fs::path();
 	// Tamar
 	int gridSize = 8;
-	m_Smk.resize(gridSize);
-	std::fill(m_Smk.begin(), m_Smk.end(), Spectrum(0.0f));
+	m_densityDerivative.resize(gridSize);
+	std::fill(m_densityDerivative.begin(), m_densityDerivative.end(), Spectrum(0.0f));
 }
 
 Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
@@ -112,8 +112,8 @@ Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
 	m_degenerateEmitters = scene->m_degenerateEmitters;
 	// Tamar
 	int gridSize = 8;
-	m_Smk.resize(gridSize);
-	std::fill(m_Smk.begin(), m_Smk.end(), Spectrum(0.0f));
+	m_densityDerivative.resize(gridSize);
+	std::fill(m_densityDerivative.begin(), m_densityDerivative.end(), Spectrum(0.0f));
 }
 
 Scene::Scene(Stream *stream, InstanceManager *manager)
@@ -175,8 +175,8 @@ Scene::Scene(Stream *stream, InstanceManager *manager)
 		m_netObjects.push_back(static_cast<NetworkedObject *>(manager->getInstance(stream)));
 	// Tamar
 	int gridSize = 8;
-	m_Smk.resize(gridSize);
-	std::fill(m_Smk.begin(), m_Smk.end(), Spectrum(0.0f));
+	m_densityDerivative.resize(gridSize);
+	std::fill(m_densityDerivative.begin(), m_densityDerivative.end(), Spectrum(0.0f));
 
 	initialize();
 }

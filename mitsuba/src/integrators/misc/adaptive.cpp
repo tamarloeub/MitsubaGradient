@@ -151,8 +151,8 @@ public:
 			RayDifferential eyeRay;
 			Spectrum sampleValue = sensor->sampleRay(
 				eyeRay, samplePos, apertureSample, timeSample);
-			std::vector<Spectrum> Smk = scene->getSmk();//(gridSize);
-			sampleValue *= m_subIntegrator->Li(eyeRay, rRec, Smk, false);//, scene->getSmk());
+			std::vector<Spectrum> densityDerivative = scene->getDensityDerivative();//(gridSize);
+			sampleValue *= m_subIntegrator->Li(eyeRay, rRec, densityDerivative, false);//, scene->getDensityDerivative());
 			luminance += sampleValue.getLuminance();
 		}
 
@@ -211,7 +211,7 @@ public:
 
 			Float mean = 0, meanSqr = 0.0f;
 			sampleCount = 0;
-			std::vector<Spectrum> Smk = scene->getSmk();//(gridSize);
+			std::vector<Spectrum> densityDerivative = scene->getDensityDerivative();//(gridSize);
 
 			while (true) {
 				if (stop)
@@ -230,7 +230,7 @@ public:
 					eyeRay, samplePos, apertureSample, timeSample);
 				eyeRay.scaleDifferential(diffScaleFactor);
 
-				sampleValue *= m_subIntegrator->Li(eyeRay, rRec, Smk, false);
+				sampleValue *= m_subIntegrator->Li(eyeRay, rRec, densityDerivative, false);
 
 				Float sampleLuminance;
 				if (block->put(samplePos, sampleValue, rRec.alpha)) {
@@ -285,8 +285,8 @@ public:
 		}
 	}
 
-	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk, bool print_out) const {
-		return m_subIntegrator->Li(ray, rRec, Smk, print_out);
+	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec, std::vector<Spectrum> &densityDerivative, bool print_out) const {
+		return m_subIntegrator->Li(ray, rRec, densityDerivative, print_out);
 	}
 
 	Spectrum E(const Scene *scene, const Intersection &its, const Medium *medium,

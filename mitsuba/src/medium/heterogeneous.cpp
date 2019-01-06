@@ -421,7 +421,7 @@ public:
 			}
 
 			// update medium recored
-			mRec.devIndxs.insert(mRec.devIndxs.end(), inIndxs.begin(), inIndxs.end());
+			mRec.scoreIndxs.insert(mRec.scoreIndxs.end(), inIndxs.begin(), inIndxs.end());
 
 			Float densityAtT = lookupDensity(p, ray.d) * m_scale;
 			Float factor;
@@ -450,7 +450,7 @@ public:
 //					cout << "length = " << length << endl;
 //				}
 //			}
-			mRec.devVals.insert(mRec.devVals.end(), inDev.begin(), inDev.end());
+			mRec.scoreVals.insert(mRec.scoreVals.end(), inDev.begin(), inDev.end());
 
 //			#if defined(HETVOL_STATISTICS)
 //				++avgRayMarchingStepsTransmittance;
@@ -910,10 +910,10 @@ public:
 					if ((DEBUG_TAMAR) and (print_out)) {
 						cout << "sample dist:" << endl;
 						cout << "point in space : (" << p[0] << ", " << p[1] << ", " << p[2] << ")" << endl;
-						cout <<  "size of mRec.devVals = " << mRec.devVals.size() << endl;
-						for(std::vector<int>::size_type i = 0; i != mRec.devVals.size(); i++) {
-						    cout << "mRec.derivative[" << mRec.devIndxs[i] << "] = "
-						    		<< mRec.devVals[i] << endl;
+						cout <<  "size of mRec.scoreVals = " << mRec.scoreVals.size() << endl;
+						for(std::vector<int>::size_type i = 0; i != mRec.scoreVals.size(); i++) {
+						    cout << "mRec.derivative[" << mRec.scoreIndxs[i] << "] = "
+						    		<< mRec.scoreVals[i] << endl;
 						}
 					}
 
@@ -1019,11 +1019,12 @@ protected:
 					ray.o[i] = maxVal;
 				else
 					return false;
-			else if (maxDist < 1e-6f && direction > 0.0)
-				if (boundaryArray[i] == EPeriodic)
+			else if (maxDist < 1e-6f && direction > 0.0) {
+				if (boundaryArray[i] == EPeriodic) 
 					ray.o[i] = minVal;
 				else
 					return false;
+			}
 		}
 		return true;
 	}

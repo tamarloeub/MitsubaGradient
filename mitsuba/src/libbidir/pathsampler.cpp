@@ -300,8 +300,8 @@ void PathSampler::sampleSplats(const Point2i &offset, SplatList &list) {
 					m_excludeDirectIllum ? (RadianceQueryRecord::ERadiance
 					& ~(RadianceQueryRecord::EDirectSurfaceRadiance | RadianceQueryRecord::EEmittedRadiance))
 					: RadianceQueryRecord::ERadiance, sensor->getMedium());
-				std::vector<Spectrum> Smk = m_scene->getSmk();
-				value *= m_integrator->Li(sensorRay, rRec, Smk, false);
+				std::vector<Spectrum> densityDerivative = m_scene->getDensityDerivative();
+				value *= m_integrator->Li(sensorRay, rRec, densityDerivative, false);
 
 				list.append(samplePos, value);
 			}

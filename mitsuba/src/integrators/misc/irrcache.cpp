@@ -253,7 +253,7 @@ public:
 		}
 	}
 
-	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk, bool print_out) const {
+	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec, std::vector<Spectrum> &densityDerivative, bool print_out) const {
 		Intersection &its = rRec.its;
 
 		if (m_indirectOnly && (rRec.type & RadianceQueryRecord::EDirectSurfaceRadiance))
@@ -277,10 +277,10 @@ public:
 
 				rRec.type ^= RadianceQueryRecord::EIndirectSurfaceRadiance;
 				return E * bsdf->getDiffuseReflectance(its) * INV_PI +
-					m_subIntegrator->Li(ray, rRec, Smk, false);
+					m_subIntegrator->Li(ray, rRec, densityDerivative, false);
 			}
 		}
-		return m_subIntegrator->Li(ray, rRec, Smk, false);
+		return m_subIntegrator->Li(ray, rRec, densityDerivative, false);
 	}
 
 	void handleMiss(RayDifferential ray, const RadianceQueryRecord &rRec,
@@ -303,7 +303,7 @@ public:
 		hs->generateDirections(rRec.its);
 		sampler->generate(Point2i(0));
 
-		std::vector<Spectrum> Smk = rRec.scene->getSmk();
+		std::vector<Spectrum> densityDerivative = rRec.scene->getDensityDerivative();
 		
 		for (unsigned int j=0; j<hs->getM(); j++) {
 			for (unsigned int k=0; k<hs->getN(); k++) {
@@ -313,7 +313,7 @@ public:
 					RadianceQueryRecord::ERadianceNoEmission | RadianceQueryRecord::EDistance);
 				rRec2.extra = 1;
 				rRec2.sampler = sampler;
-				entry.L = m_subIntegrator->Li(RayDifferential(rRec.its.p, entry.d, ray.time), rRec2, Smk, false);
+				entry.L = m_subIntegrator->Li(RayDifferential(rRec.its.p, entry.d, ray.time), rRec2, densityDerivative, false);
 				entry.dist = rRec2.dist;
 				sampler->advance();
 			}

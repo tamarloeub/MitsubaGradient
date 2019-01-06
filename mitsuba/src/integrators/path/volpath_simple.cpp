@@ -85,7 +85,7 @@ public:
 	SimpleVolumetricPathTracer(Stream *stream, InstanceManager *manager)
 	 : MonteCarloIntegrator(stream, manager) { }
 
-	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk, bool print_out) const {
+	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &densityDerivative, bool print_out) const {
 		/* Some aliases and local variables */
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;
@@ -128,10 +128,10 @@ public:
 				   \int_x^y tau(x, x') [ \sigma_s \int_{S^2} \rho(\omega,\omega') L(x,\omega') d\omega' ] dx'
 				*/
 //				if (DEBUG_TAMAR) {
-//					cout <<  "size of mRec.devVals = " << mRec.devVals.size() << endl;
-//					for(std::vector<int>::size_type i = 0; i != mRec.devVals.size(); i++) {
-//					    cout << "mRec.derivative[" << mRec.devIndxs[i] << "] = "
-//					    		<< mRec.devVals[i] << endl;
+//					cout <<  "size of mRec.scoreVals = " << mRec.scoreVals.size() << endl;
+//					for(std::vector<int>::size_type i = 0; i != mRec.scoreVals.size(); i++) {
+//					    cout << "mRec.derivative[" << mRec.scoreIndxs[i] << "] = "
+//					    		<< mRec.scoreVals[i] << endl;
 //					}
 //				}
 
@@ -149,19 +149,19 @@ public:
 				const PhaseFunction *phase = rRec.medium->getPhaseFunction();
 
 				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
-				// build Smk
-				for(std::vector<int>::size_type i = 0; i != mRec.devIndxs.size(); i++) {
+				// build densityDerivative
+				for(std::vector<int>::size_type i = 0; i != mRec.scoreIndxs.size(); i++) {
 //					if ((print_out) and (DEBUG_TAMAR)) {
 //						cout << "Ray:" << endl;
-//						cout << "mRec.devVals[" << i << "] = " << mRec.devVals[i] << " at index " << mRec.devIndxs[i] << endl;
-//						cout << Smk[mRec.devIndxs[i]].toString() << endl;
+//						cout << "mRec.scoreVals[" << i << "] = " << mRec.scoreVals[i] << " at index " << mRec.scoreIndxs[i] << endl;
+//						cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 //					}
 
-					Smk[mRec.devIndxs[i]] += throughput * mRec.devVals[i];
+					densityDerivative[mRec.scoreIndxs[i]] += throughput * mRec.scoreVals[i];
 				}
 				if ((print_out) and (DEBUG_TAMAR)) {
-					for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
-						cout << "Smk at " << i << " = " << Smk[i].toString() << endl;
+					for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
+						cout << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl;
 					}
 				}
 
@@ -188,14 +188,14 @@ public:
 						MediumSamplingRecord mdRec;
 						RayDifferential rayD = RayDifferential(mRec.p, mRec.orientation ,mRec.time);
 						rRec.medium->derivateDensity(rayD, mdRec, true, print_out);
-						for(std::vector<int>::size_type i = 0; i != mdRec.devIndxs.size(); i++) {
+						for(std::vector<int>::size_type i = 0; i != mdRec.scoreIndxs.size(); i++) {
 							if (print_out) {
 								cout << "LE:" << endl;
-								cout << Smk[mRec.devIndxs[i]].toString() << endl;
+								cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 							}
-							Smk[mdRec.devIndxs[i]] += throughput * mdRec.devVals[i] * phaseVal;
+							densityDerivative[mdRec.scoreIndxs[i]] += throughput * mdRec.scoreVals[i] * phaseVal;
 							if (print_out)
-								cout << Smk[mRec.devIndxs[i]].toString() << endl;
+								cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 						}
 
 					}

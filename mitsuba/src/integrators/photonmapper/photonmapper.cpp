@@ -393,7 +393,7 @@ public:
 			Scheduler::getInstance()->cancel(m_proc);
 	}
 
-	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk, bool print_out) const {
+	Spectrum Li(const RayDifferential &ray, RadianceQueryRecord &rRec, std::vector<Spectrum> &densityDerivative, bool print_out) const {
 		Spectrum LiSurf(0.0f), LiMedium(0.0f), transmittance(1.0f);
 		Intersection &its = rRec.its;
 		const Scene *scene = rRec.scene;
@@ -479,7 +479,7 @@ public:
 				if (its.isMediumTransition())
 					rRec2.medium = its.getTargetMedium(bsdfRay.d);
 
-				LiSurf += bsdfVal * m_parentIntegrator->Li(bsdfRay, rRec2, Smk, print_out);
+				LiSurf += bsdfVal * m_parentIntegrator->Li(bsdfRay, rRec2, densityDerivative, print_out);
 			}
 		}
 
@@ -636,7 +636,7 @@ public:
 					if (its.isMediumTransition())
 						rRec2.medium = its.getTargetMedium(bsdfRay.d);
 
-					LiSurf += bsdfVal * m_parentIntegrator->Li(bsdfRay, rRec2, Smk, print_out) * weightBSDF;
+					LiSurf += bsdfVal * m_parentIntegrator->Li(bsdfRay, rRec2, densityDerivative, print_out) * weightBSDF;
 				}
 			}
 		}

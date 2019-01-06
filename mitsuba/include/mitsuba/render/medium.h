@@ -65,12 +65,12 @@ public:
 	Float beta;
 
 	// Tamar
-	// vector containing all the grid indexes that has a derivation value (contains in devVals)
-	std::vector<int> devIndxs;
+	// vector containing all the grid indexes that has a derivation value (contains in scoreVals)
+	std::vector<int> scoreIndxs;
 
 	// Tamar
-	// vector containing all the derivation values according to the indexes in devIndxs vector
-	std::vector<float> devVals;
+	// vector containing all the derivative values (score function) according to the indexes in scoreIndxs vector
+	std::vector<float> scoreVals;
 
 	/// Records the probability density of sampling a medium interaction at p
 	Float pdfSuccess;

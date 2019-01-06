@@ -143,7 +143,7 @@ public:
 			sampler->request2DArray(m_bsdfSamples);
 	}
 
-	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk, bool print_out) const {
+	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &densityDerivative, bool print_out) const {
 		/* Some aliases and local variables */
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;

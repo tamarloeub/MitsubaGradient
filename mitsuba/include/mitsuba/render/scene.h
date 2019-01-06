@@ -1104,7 +1104,7 @@ public:
 	inline const ref_vector<ConfigurableObject> &getReferencedObjects() const { return m_objects; }
 
 	//Tamar
-	inline const std::vector<Spectrum> &getSmk() const { return m_Smk; }
+	inline const std::vector<Spectrum> &getDensityDerivative() const { return m_densityDerivative; }
 
 	/// Return the name of the file containing the original description of this scene
 	inline const fs::path &getSourceFile() const { return *m_sourceFile; }
@@ -1169,7 +1169,7 @@ private:
 	bool m_degenerateSensor;
 	bool m_degenerateEmitters;
 	//Tamar
-	std::vector<Spectrum> m_Smk;
+	std::vector<Spectrum> m_densityDerivative;
 
 };
 

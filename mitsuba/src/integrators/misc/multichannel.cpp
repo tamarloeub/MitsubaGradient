@@ -205,11 +205,11 @@ public:
 				rRec.rayIntersect(sensorRay);
 
 				int offset = 0;
-				std::vector<Spectrum> Smk = scene->getSmk();
+				std::vector<Spectrum> densityDerivative = scene->getDensityDerivative();
 				for (size_t k = 0; k<m_integrators.size(); ++k) {
 					RadianceQueryRecord rRec2(rRec);
 					rRec2.its = rRec.its;
-					Spectrum result = spec * m_integrators[k]->Li(sensorRay, rRec2, Smk, false);
+					Spectrum result = spec * m_integrators[k]->Li(sensorRay, rRec2, densityDerivative, false);
 					for (int l = 0; l<SPECTRUM_SAMPLES; ++l)
 						temp[offset++] = result[l];
 				}
@@ -252,7 +252,7 @@ public:
 		}
 	}
 
-	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &Smk, bool print_out) const {
+	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, std::vector<Spectrum> &densityDerivative, bool print_out) const {
 		NotImplementedError("Li");
 	}
 

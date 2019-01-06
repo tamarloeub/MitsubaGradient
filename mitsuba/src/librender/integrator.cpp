@@ -82,9 +82,9 @@ Spectrum SamplingIntegrator::E(const Scene *scene, const Intersection &its,
 			Vector d = frame.toWorld(warp::squareToCosineHemisphere(query.nextSample2D()));
 			++query.depth;
 			query.medium = medium;
-			std::vector<Spectrum> Smk = scene->getSmk();
+			std::vector<Spectrum> densityDerivative = scene->getDensityDerivative();
 			cout << "SamplingIntegrator::E" << endl; //Tamar
-			E += Li(RayDifferential(its.p, d, its.time), query, Smk, false) * M_PI;
+			E += Li(RayDifferential(its.p, d, its.time), query, densityDerivative, false) * M_PI;
 		}
 
 		sampler->advance();
@@ -173,12 +173,12 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			break;
 
 		sampler->generate(offset);
-		//build Smk
-		std::vector<Spectrum> Smk = rRec.scene->getSmk();
+		//build densityDerivative
+		std::vector<Spectrum> densityDerivative = rRec.scene->getDensityDerivative();
 
 		if (DEBUG_TAMAR) {
-			for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
-				cout << "Smk at " << i << " = " << Smk[i].toString() << endl;
+			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
+				cout << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl;
 			}
 		}
 
@@ -211,20 +211,20 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 				cout << "sample " << j << endl;
 			}
 
-			spec *= Li(sensorRay, rRec, Smk, print_out);
+			spec *= Li(sensorRay, rRec, densityDerivative, print_out);
 
-			bool output_to_file = 1;   //redirect Smk to file
-			std::ofstream myfile;      //redirect Smk to file
-			myfile.open("output.txt"); //redirect Smk to file
+			bool output_to_file = 1;   //redirect densityDerivative to file
+			std::ofstream myfile;      //redirect densityDerivative to file
+			myfile.open("output.txt"); //redirect densityDerivative to file
 			if (output_to_file) { //((print_out) and (DEBUG_TAMAR)){
-				for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
+				for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
 //					if (i == 0) {
 //						cout << "spec = " << spec.toString() << endl;
 //					}
-					myfile << "Smk at " << i << " = " << Smk[i].toString() << endl; //redirect Smk to file
+					myfile << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl; //redirect densityDerivative to file
 				}
 			}
-			myfile.close(); //redirect Smk to file
+			myfile.close(); //redirect densityDerivative to file
 
 			block->put(samplePos, spec, rRec.alpha);
 
