@@ -186,7 +186,27 @@ class pyMedium(object):
     
     def get_albedo_data(self):
         return self._albedo
-            
+               
+    def get_boundary_conditions(self):
+        if self._boundaries == None:
+            self._boundaries = {'x' : 'open', 'y' : 'open' }
+        return self._boundaries
+    
+    def get_density_data(self):
+        return self._density
+   
+    def get_phase_data(self):
+        return self._phase    
+        
+    def get_world_transform(self):
+        bb           = self._bounding_box
+        bottom_left  = Vector(bb[0], bb[1], bb[2])
+        top_right    = Vector(bb[3], bb[4], bb[5])
+        scale_v      = (top_right - bottom_left) / 2.0
+        translate_v  = bottom_left + scale_v
+        transform    = Transform.translate(translate_v) * Transform.scale(scale_v)
+        return transform       
+
     def albedo_to_mitsuba(self):
         volume = self.get_albedo_data()
         if np.array(volume).shape == ():
@@ -201,14 +221,6 @@ class pyMedium(object):
             }
         return albedo_str
     
-    def get_boundary_conditions(self):
-        if self._boundaries == None:
-            self._boundaries = {'x' : 'open', 'y' : 'open' }
-        return self._boundaries
-    
-    def get_density_data(self):
-        return self._density
-    
     def density_to_mitsuba(self):
         volume = self.get_density_data()
         if np.array(volume).shape == ():
@@ -222,10 +234,7 @@ class pyMedium(object):
                 'filename' : self._files['density']
             }
         return density_str
-    
-    def get_phase_data(self):
-        return self._phase    
-    
+
     def phase_to_mitsuba(self):
         volume = self.get_phase_data()
         if np.array(volume).shape == ():
@@ -245,15 +254,6 @@ class pyMedium(object):
                 }
             }
         return phase_str
-    
-    def get_world_transform(self):
-        bb           = self._bounding_box
-        bottom_left  = Vector(bb[0], bb[1], bb[2])
-        top_right    = Vector(bb[3], bb[4], bb[5])
-        scale_v      = (top_right - bottom_left) / 2.0
-        translate_v  = bottom_left + scale_v
-        transform    = Transform.translate(translate_v) * Transform.scale(scale_v)
-        return transform       
 
     def bounding_box_to_mitsuba(self, scene_type='smallMedium'):
         if scene_type is 'step':
