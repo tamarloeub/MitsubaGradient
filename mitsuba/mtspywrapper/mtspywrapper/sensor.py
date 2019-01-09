@@ -7,6 +7,8 @@ class pySampler(object):
     def __init__(self):
         self._type = 'ldsampler'
         self._sampleCount = 4096
+        self._pmgr = PluginManager.getInstance()
+        
         
     def set_sampler(self, stype='ldsampler', sampleCount=4096):
         self._type = stype
@@ -28,6 +30,7 @@ class pySampler(object):
 class pyFilm(object):
     def __init__(self):
         self._type       = 'mfilm'
+        self._pmgr       = PluginManager.getInstance()        
         self._width      = None
         self._height     = None       
         self._fileFormat = None
@@ -74,6 +77,8 @@ class pySensor(object):
         self._type    = None
         self._film    = pyFilm()
         self._sampler = pySampler()
+        self._toWorld_dict = dict()
+        self._toWorld_transform = None
     
     def set_sensor_type(self, sensor_type):
         self._type = sensor_type
@@ -85,7 +90,12 @@ class pySensor(object):
         self._film.set_film(ftype, width, height, fileFormat)
     
     def set_to_world(self, origin, target, up):
-        self._toWorld = Transform.lookAt(
+        self._toWorld_dict = {
+            'origin' : origin, 
+            'target' : target, 
+            'up'     : up
+        }
+        self._toWorld_transform = Transform.lookAt(
                 origin, # Camera origin
                 target, # Camera target
                 up )    # 'up' vector
@@ -101,7 +111,10 @@ class pySensor(object):
         return self._sampler
     
     def get_world_transform(self):
-        return self._toWorld
+        return self._toWorld_transform
+    
+    def get_world_points(self):
+        return self._toWorld_dict    
         
     def sensor_to_mitsuba(self):
         sampler = self.get_sampler()

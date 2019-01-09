@@ -178,14 +178,14 @@ class pyMedium(object):
         self.create_boundingbox(bounds)
         self._scale = float(density_mat.max())
                                     
-        density_mat = density_mat / self._scale
+        density_norm = density_mat / self._scale
         
         if density_mat.shape == ():
             self._density = float(data)
         else:
             assert self._shape == density_mat.shape, "Grid volume does not agree with medium shape"         
             self._density = density_mat
-            self.set_vol_file(density_mat, 'density')
+            self.set_vol_file(density_norm, 'density')
     
     def get_albedo_data(self):
         return self._albedo
