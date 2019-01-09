@@ -125,8 +125,10 @@ class pyMedium(object):
     def set_albedo(self, data):
         volume = np.array(data)
         assert ( (volume.max() <= 1) and (volume.min() >= 0) ), "Values of albedo should be between 0 to 1" 
+
         if volume.ndim == 4:
             assert (volume.shape[3] == 3),"albedo fourth dimention should be of size 3"
+            
         if volume.shape == ():
             self._albedo = data
         else:
