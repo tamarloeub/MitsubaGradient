@@ -124,15 +124,18 @@ class pyMedium(object):
         
     def set_albedo(self, data):
         volume = np.array(data)
-        assert ( (volume.max() <= 1) and (volume.min() >= 0) ), "Values of albedo should be between 0 to 1"    
+        assert ( (volume.max() <= 1) and (volume.min() >= 0) ), "Values of albedo should be between 0 to 1" 
+        if volume.ndim == 4:
+            assert (volume.shape[3] == 3),"albedo fourth dimention should be of size 3"
         if volume.shape == ():
             self._albedo = data
         else:
             if self._shape == () : 
                 self.set_volume(volume.shape)
             else:
-                assert self._shape == volume.shape, "Grid volume does not agree with medium shape"                    
-            self._albedo = dup_volume(volume, [1, 1, 1, 3])
+                assert self._shape[:,:,:] == volume.shape, "Grid volume does not agree with medium shape" 
+            if (volume.ndim <= 3):
+                self._albedo = dup_volume(volume, [1, 1, 1, 3])
             self.set_vol_file(self._albedo, 'albedo')
     
     def set_phase(self, data=0.85):
@@ -282,11 +285,8 @@ class pyMedium(object):
                 'density'   : self.density_to_mitsuba(),
                 'albedo'    : self.albedo_to_mitsuba(),
                 'scale'     : self.scale,
-                'phase'     : {
-                    'type' : 'hg',
-                    'g' : self.get_phase_data()
-                    } #self.phase_to_mitsuba()
-            })
+                'phase'     : self.phase_to_mitsuba()
+                })
         else:
             medium = self._pmgr.create({
                 'type'      : 'heterogeneous',
@@ -296,10 +296,7 @@ class pyMedium(object):
                 'density'   : self.density_to_mitsuba(),
                 'albedo'    : self.albedo_to_mitsuba(),
                 'scale'     : self.scale,                
-                'phase'     : {
-                    'type' : 'hg',
-                    'g' : self.get_phase_data()
-                    } #self.phase_to_mitsuba()
+                'phase'     : self.phase_to_mitsuba()
             })            
         return medium    
     

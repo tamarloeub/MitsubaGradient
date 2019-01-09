@@ -965,6 +965,7 @@ public:
 		oss << "HeterogeneousMedium[" << endl
 			<< "  density = " << indent(m_density.toString()) << "," << endl
 			<< "  albedo = " << indent(m_albedo.toString()) << "," << endl
+			<< "  phase = " << indent(m_phaseFunction.toString()) << "," << endl
 			<< "  orientation = " << indent(m_orientation.toString()) << "," << endl
 			<< "  stepSize = " << m_stepSize << "," << endl
 			<< "  scale = " << m_scale << "," << endl
