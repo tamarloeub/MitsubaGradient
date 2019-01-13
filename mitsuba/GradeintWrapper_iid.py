@@ -87,7 +87,7 @@ grid_size = 8
 
 # mitsuba parameters
 n_sensors     = 1#4
-Np_vector     = np.array([1, 2, 4, 8, 16, 32]) * 128 # single NP: np.array([32]) * 128 #
+Np_vector     = np.array([32]) * 128 #np.array([1, 2, 4, 8, 16, 32]) * 128
 scene_gt      = [ None ] * n_sensors # create an empty list
 algo_scene    = [ None ] * n_sensors # create an empty list
 sensors_pos   = [ None ] * n_sensors # create an empty list
@@ -172,8 +172,8 @@ for nps in range(len(Np_vector)):
                 for ss in range(n_sensors):
                     # Create scene with given beta
                     algo_scene[ss] = scene_gt[ss].copy_scene_with_different_density(beta)
-                    [ algo_radiance[nps][bb_gt][bb][iteration][ss], 
-                      inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores)
+                    [ algo_radiance[nps][bb_gt][bb][iteration][ss], _ ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores)
+                    [ _, inner_grad ]    = render_scene(algo_scene[ss]._scene, output_filename, n_cores)                    
                     
                     # beta is not a Spectrum, for now:
                     # one unknown
@@ -222,125 +222,126 @@ import matplotlib.pyplot as plt
 iters = np.linspace(1, max_iterations, max_iterations)
 
 ## one Np
-#out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
-#for bb_gt in range(len(beta_gt_factor)):
-    #beta0_factor = beta_gt_factor[bb_gt] + beta0_diff
-    #for bb in range(len(beta0_diff)):
-        #diff      = np.squeeze( radiance_gt[0][bb_gt] * np.ones(algo_radiance[0][bb_gt][bb].shape) - algo_radiance[0][bb_gt][bb] )
-        #cost      = 0.5 * diff**2
-        #tmp       = cost_gradient[0][bb_gt][bb]
-        #gradient  = (np.mean(np.squeeze(np.mean(tmp, 2)), 1))
-        #betas_err = abs(betas[0][bb_gt][bb] - beta_gt_factor[bb_gt]) / beta_gt_factor[bb_gt] * 100
+out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
+for bb_gt in range(len(beta_gt_factor)):
+    beta0_factor = beta_gt_factor[bb_gt] + beta0_diff
+    for bb in range(len(beta0_diff)):
+        diff      = np.squeeze( radiance_gt[0][bb_gt] * np.ones(algo_radiance[0][bb_gt][bb].shape) - algo_radiance[0][bb_gt][bb] )
+        cost      = 0.5 * diff**2
+        tmp       = cost_gradient[0][bb_gt][bb]
+        gradient  = (np.mean(np.squeeze(np.mean(tmp, 2)), 1))
+        betas_err = abs(betas[0][bb_gt][bb] - beta_gt_factor[bb_gt]) / beta_gt_factor[bb_gt] * 100
 
-        #plt.figure(figsize=(19,9))    
+        plt.figure(figsize=(19,9))    
         
-        #plt.subplot(2, 2, 1)
-        #plt.plot(iters, cost, '--',  marker='o', markersize=5)
-        #plt.title('Cost', fontweight='bold')              
-        #plt.grid(True)
-        #plt.xlim(left=0)
+        plt.subplot(2, 2, 1)
+        plt.plot(iters, cost, '--',  marker='o', markersize=5)
+        plt.title('Cost', fontweight='bold')              
+        plt.grid(True)
+        plt.xlim(left=0)
                 
-        #plt.subplot(2, 2, 3)
-        #plt.plot(iters, gradient, '--',  marker='o', markersize=5)
-        #plt.title('Gradient', fontweight='bold')
-        #plt.xlabel('iteration')                
-        #plt.grid(True)
-        #plt.xlim(left=0)
+        plt.subplot(2, 2, 3)
+        plt.plot(iters, gradient, '--',  marker='o', markersize=5)
+        plt.title('Gradient', fontweight='bold')
+        plt.xlabel('iteration')                
+        plt.grid(True)
+        plt.xlim(left=0)
     
-        #plt.subplot(2, 2, 2)
-        #plt.plot(iters, betas[0][bb_gt][bb], '--',  marker='o', markersize=5)
-        #plt.title('Beta', fontweight='bold')
-        #plt.grid(True)
-        #plt.xlim(left=0)
+        plt.subplot(2, 2, 2)
+        plt.plot(iters, betas[0][bb_gt][bb], '--',  marker='o', markersize=5)
+        plt.title('Beta', fontweight='bold')
+        plt.grid(True)
+        plt.xlim(left=0)
     
-        #plt.subplot(2, 2, 4)
-        #plt.plot(iters, betas_err, '--',  marker='o', markersize=5)
-        #plt.title('Beta error')
-        #plt.xlabel('iteration')
-        #plt.ylabel('[%]', fontweight='bold')
-        #plt.grid(True)
-        #plt.xlim(left=0)
+        plt.subplot(2, 2, 4)
+        plt.plot(iters, betas_err, '--',  marker='o', markersize=5)
+        plt.title('Beta error')
+        plt.xlabel('iteration')
+        plt.ylabel('[%]', fontweight='bold')
+        plt.grid(True)
+        plt.xlim(left=0)
     
-        #plt.suptitle('Original beta = ' + str(beta_gt_factor[bb_gt]) + ', starting with beta0 = ' + str(beta0_factor[bb]) + ', Np = ' + str(Np_vector[0]), fontweight='bold')
-        ##plt.show()
+        plt.suptitle('IID, Original beta = ' + str(beta_gt_factor[bb_gt]) + ', starting with beta0 = ' + str(beta0_factor[bb]) + ', Np = ' + str(Np_vector[0]), fontweight='bold')
+        #plt.show()
         
-        #out_name = 'dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam unknown 1 beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + '.png'
-        #plt.savefig(out_path + out_name, dpi=300)
+        out_name = 'independent grad and fwd Np '+ str(Np_vector[0]) + ' adam unknown 1 beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + '.png'
+        plt.savefig(out_path + out_name, dpi=300)
 
 ## several Nps
 out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
     
-for bb_gt in range(len(beta_gt_factor)):
-    beta0_factor = beta_gt_factor[bb_gt] + beta0_diff
-    for bb in range(len(beta0_diff)):
-        for np_p in range(2):        
-            #numeric_grad = [None] * 3
-            diff      = [None] * 3
-            cost      = [None] * 3
-            tmp       = [None] * 3
-            gradient  = [None] * 3
-            betas_err = [None] * 3
+#for bb_gt in range(len(beta_gt_factor)):
+    #beta0_factor = beta_gt_factor[bb_gt] + beta0_diff
+    #for bb in range(len(beta0_diff)):
+        #for np_p in range(2):        
+            ##numeric_grad = [None] * 3
+            #diff      = [None] * 3
+            #cost      = [None] * 3
+            #tmp       = [None] * 3
+            #gradient  = [None] * 3
+            #betas_err = [None] * 3
     
-            plt.figure(figsize=(8,10))
-            for np_i in range(3):
-                #numeric_grad[np_i] = np.gradient(cost)
-                diff[np_i]      = np.squeeze(algo_radiance[3 * np_p + np_i][bb_gt][bb] - radiance_gt[3 * np_p + np_i][bb_gt] * np.ones(algo_radiance[3 * np_p + np_i][bb_gt][bb].shape))
-                cost[np_i]      = 0.5 * diff[np_i]**2
-                tmp[np_i]       = cost_gradient[3 * np_p + np_i][bb_gt][bb]
-                gradient[np_i]  = (np.mean(np.squeeze(np.mean(tmp[np_i], 2)), 1)) * diff[np_i]
-                betas_err[np_i] = abs(betas[3 * np_p + np_i][bb_gt][bb] - beta_gt_factor[bb_gt]) / beta_gt_factor[bb_gt] * 100
+            #plt.figure(figsize=(8,10))
+            #for np_i in range(3):
+                ##numeric_grad[np_i] = np.gradient(cost)
+                #diff[np_i]      = np.squeeze(algo_radiance[3 * np_p + np_i][bb_gt][bb] - radiance_gt[3 * np_p + np_i][bb_gt] * np.ones(algo_radiance[3 * np_p + np_i][bb_gt][bb].shape))
+                #cost[np_i]      = 0.5 * diff[np_i]**2
+                #tmp[np_i]       = cost_gradient[3 * np_p + np_i][bb_gt][bb]
+                #gradient[np_i]  = (np.mean(np.squeeze(np.mean(tmp[np_i], 2)), 1)) * diff[np_i]
+                #betas_err[np_i] = abs(betas[3 * np_p + np_i][bb_gt][bb] - beta_gt_factor[bb_gt]) / beta_gt_factor[bb_gt] * 100
             
-                plt.subplot(3, 3, 3 * np_i + 1)
-                #plt.plot(time_per_iter[bb_gt][bb], cost, '--',  marker='o', markersize=5)
-                plt.plot(iters, cost[np_i], '--',  marker='o', markersize=5)
-                plt.title('Cost, Np = ' + str(Np_vector[3 * np_p + np_i]), fontweight='bold')
-                #plt.title('Cost value')
-                #plt.ylabel('Cost value')
-                if np_i == 2:
-                    plt.xlabel('iteration')                
-                plt.grid(True)
-                plt.xlim(left=0)
+                #plt.subplot(3, 3, 3 * np_i + 1)
+                ##plt.plot(time_per_iter[bb_gt][bb], cost, '--',  marker='o', markersize=5)
+                #plt.plot(iters, cost[np_i], '--',  marker='o', markersize=5)
+                #plt.title('Cost, Np = ' + str(Np_vector[3 * np_p + np_i]), fontweight='bold')
+                ##plt.title('Cost value')
+                ##plt.ylabel('Cost value')
+                #if np_i == 2:
+                    #plt.xlabel('iteration')                
+                #plt.grid(True)
+                #plt.xlim(left=0)
                         
-                plt.subplot(3, 3, 3 * np_i + 2)
-                #plt.plot(time_per_iter[bb_gt][bb], gradient, '--',  marker='o', markersize=5)
-                plt.plot(iters, gradient[np_i], '--',  marker='o', markersize=5)
-                #plt.plot(iters, numeric_grad[np_i], 'r--',  marker='o', markersize=3)        
-                #plt.title('Gradient value, Np = ' + str(Np_vector[3 * np_p + np_i]))
-                plt.title('Gradient', fontweight='bold')
-                if np_i == 2:
-                    plt.xlabel('iteration')                
-                plt.grid(True)
-                plt.xlim(left=0)
+                #plt.subplot(3, 3, 3 * np_i + 2)
+                ##plt.plot(time_per_iter[bb_gt][bb], gradient, '--',  marker='o', markersize=5)
+                #plt.plot(iters, gradient[np_i], '--',  marker='o', markersize=5)
+                ##plt.plot(iters, numeric_grad[np_i], 'r--',  marker='o', markersize=3)        
+                ##plt.title('Gradient value, Np = ' + str(Np_vector[3 * np_p + np_i]))
+                #plt.title('Gradient', fontweight='bold')
+                #if np_i == 2:
+                    #plt.xlabel('iteration')                
+                #plt.grid(True)
+                #plt.xlim(left=0)
             
-                plt.subplot(6, 3, 6 * np_i + 3)
-                #plt.plot(time_per_iter[bb_gt][bb], betas[bb_gt][bb], '--',  marker='o', markersize=5)
-                plt.plot(iters, betas[3 * np_p + np_i][bb_gt][bb], '--',  marker='o', markersize=5)
-                plt.title('Beta', fontweight='bold')
-                #plt.ylabel('Beta')
-                if np_i == 2:
-                    plt.xlabel('iteration')                
-                plt.grid(True)
-                plt.xlim(left=0)
+                #plt.subplot(6, 3, 6 * np_i + 3)
+                ##plt.plot(time_per_iter[bb_gt][bb], betas[bb_gt][bb], '--',  marker='o', markersize=5)
+                #plt.plot(iters, betas[3 * np_p + np_i][bb_gt][bb], '--',  marker='o', markersize=5)
+                #plt.title('Beta', fontweight='bold')
+                ##plt.ylabel('Beta')
+                #if np_i == 2:
+                    #plt.xlabel('iteration')                
+                #plt.grid(True)
+                #plt.xlim(left=0)
             
-                plt.subplot(6, 3, 6 * (np_i + 1))
-                #plt.plot(time_per_iter[bb_gt][bb], betas_err, '--',  marker='o', markersize=5)
-                plt.plot(iters, betas_err[np_i], '--',  marker='o', markersize=5)
-                #plt.title('Beta error')
-                #plt.xlabel('Running time [sec]')
-                if np_i == 2:
-                    plt.xlabel('iteration')
-                #plt.ylabel('Beta error [%]')
-                plt.ylabel('Error [%]', fontweight='bold')
-                plt.grid(True)
-                plt.xlim(left=0)
+                #plt.subplot(6, 3, 6 * (np_i + 1))
+                ##plt.plot(time_per_iter[bb_gt][bb], betas_err, '--',  marker='o', markersize=5)
+                #plt.plot(iters, betas_err[np_i], '--',  marker='o', markersize=5)
+                ##plt.title('Beta error')
+                ##plt.xlabel('Running time [sec]')
+                #if np_i == 2:
+                    #plt.xlabel('iteration')
+                ##plt.ylabel('Beta error [%]')
+                #plt.ylabel('Error [%]', fontweight='bold')
+                #plt.grid(True)
+                #plt.xlim(left=0)
             
-            plt.suptitle('Original beta = ' + str(beta_gt_factor[bb_gt]) + ', starting with beta0 = ' + str(beta0_factor[bb]), fontweight='bold')
-            if np_p == 1:
-                s_p  = ' 2'
-            else:
-                s_p  = ''
+            #plt.suptitle('IID, Original beta = ' + str(beta_gt_factor[bb_gt]) + ', starting with beta0 = ' + str(beta0_factor[bb]), fontweight='bold')
+            #plt.show()
+            #if np_p == 1:
+                #s_p  = ' 2'
+            #else:
+                #s_p  = ''
                 
-            out_name = 'several Nps dependent unknown 1 grad and fwd beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + s_p + '.png'
-            plt.savefig(out_path + out_name, dpi=300)
+            #out_name = 'several Nps independent unknown 1 grad and fwd beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + s_p + '.png'
+            #plt.savefig(out_path + out_name, dpi=300)
             
 print('end')
