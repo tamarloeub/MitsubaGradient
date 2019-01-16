@@ -78,7 +78,7 @@ def render_scene(scene, output_filename, n_cores):
 
 ## Parameters
 # algorithm parameters
-max_iterations = 150
+max_iterations = 400 * 2
 #step_size      = 5#.5
 n_unknowns     = 1
 beta_gt_factor = np.array([1, 2, 5, 10])
@@ -86,16 +86,19 @@ beta0_diff     = np.array([-0.5, 0, 0.5, 2])
 grid_size = 8
 
 # mitsuba parameters
-n_sensors     = 1#4
-Np_vector     = np.array([32]) * 128 #np.array([1, 2, 4, 8, 16, 32]) * 128
+n_sensors     = 2#4
+# several Nps:
+#Np_vector     = np.array([1, 2, 4, 8, 16, 32]) * 128
+# single Np:
+Np_vector     = np.array([512]) * 128
 scene_gt      = [ None ] * n_sensors # create an empty list
 algo_scene    = [ None ] * n_sensors # create an empty list
 sensors_pos   = [ None ] * n_sensors # create an empty list
-radiance_gt   = np.zeros((len(Np_vector), len(beta_gt_factor), n_sensors, 1))
-algo_radiance = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, n_sensors))
+radiance_gt   = np.zeros((n_sensors, len(Np_vector), len(beta_gt_factor), 1))
+algo_radiance = np.zeros((n_sensors, len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations))
 betas         = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, n_unknowns))
 time_per_iter = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations))
-cost_gradient = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, n_sensors, grid_size, 3))
+cost_gradient = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, grid_size, 3))
 
 f_multi         = True
 output_filename = 'renderedResult'
@@ -122,12 +125,12 @@ for nps in range(len(Np_vector)):
         beta_gt        = scene_gt[0].get_scene_beta()
         
         # Render Ground Truth Scene
-        radiance_gt[nps][bb_gt][0], _ = render_scene(scene_gt[0]._scene, output_filename, n_cores)
+        radiance_gt[0][nps][bb_gt], _ = render_scene(scene_gt[0]._scene, output_filename, n_cores)
         
         ## Add more sensors
-        #sensors_pos[1] = { 'origin' : Point(0, 0, -3), 
-                           #'target' : sensors_pos[0]['target'], 
-                           #'up'     : Vector(-1, 0, 0) }
+        sensors_pos[1] = { 'origin' : Point(0, 0, -3), 
+                           'target' : sensors_pos[0]['target'], 
+                           'up'     : Vector(-1, 0, 0) }
         #sensors_pos[2] = { 'origin' : Point(0, 3, 0), 
                            #'target' : sensors_pos[0]['target'], 
                            #'up'     : Vector(0, 0, 1) }
@@ -135,12 +138,12 @@ for nps in range(len(Np_vector)):
                            #'target' : sensors_pos[0]['target'], 
                            #'up'     : Vector(0, 0, -1) }
         
-        #scene_gt[1]    = scene_gt[0].copy_scene_with_different_sensor_position(sensors_pos[1]['origin'], sensors_pos[1]['target'], sensors_pos[1]['up'])
+        scene_gt[1]    = scene_gt[0].copy_scene_with_different_sensor_position(sensors_pos[1]['origin'], sensors_pos[1]['target'], sensors_pos[1]['up'])
         #scene_gt[2]    = scene_gt[0].copy_scene_with_different_sensor_position(sensors_pos[2]['origin'], sensors_pos[2]['target'], sensors_pos[2]['up'])
         #scene_gt[3]    = scene_gt[0].copy_scene_with_different_sensor_position(sensors_pos[3]['origin'], sensors_pos[3]['target'], sensors_pos[3]['up'])
         
         
-        #radiance_gt[1], _ = render_scene(scene_gt[1]._scene, output_filename, n_cores)
+        radiance_gt[1][nps][bb_gt], _ = render_scene(scene_gt[1]._scene, output_filename, n_cores)
         #radiance_gt[2], _ = render_scene(scene_gt[2]._scene, output_filename, n_cores)
         #radiance_gt[3], _ = render_scene(scene_gt[3]._scene, output_filename, n_cores)
         
@@ -172,19 +175,19 @@ for nps in range(len(Np_vector)):
                 for ss in range(n_sensors):
                     # Create scene with given beta
                     algo_scene[ss] = scene_gt[ss].copy_scene_with_different_density(beta)
-                    [ algo_radiance[nps][bb_gt][bb][iteration][ss], _ ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores)
+                    [ algo_radiance[ss][nps][bb_gt][bb][iteration], _ ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores)
                     [ _, inner_grad ]    = render_scene(algo_scene[ss]._scene, output_filename, n_cores)                    
                     
                     # beta is not a Spectrum, for now:
                     # one unknown
                     inner_grad_float = np.mean(np.mean(inner_grad))
                     
-                    cost_grad += inner_grad_float * np.mean( radiance_gt[nps][bb_gt][ss] - algo_radiance[nps][bb_gt][bb][iteration][ss] )
+                    cost_grad += inner_grad_float * np.mean( radiance_gt[ss][nps][bb_gt] - algo_radiance[ss][nps][bb_gt][bb][iteration] )
                     
                 #print(algo_radiance[bb_gt][bb][iteration])
                     
                 #cost_grad_mat = np.reshape(cost_grad, beta.shape, 'C') #CHECK - I thins it's column stack but it's not C style 'F' ot 'C'
-                cost_gradient[nps][bb_gt][bb][iteration][ss] = cost_grad
+                cost_gradient[nps][bb_gt][bb][iteration] = cost_grad
                 cost_grad_mat = np.ones(beta.shape) * cost_grad
                 
                 ## ADAM implementation
@@ -221,15 +224,21 @@ scheduler.stop()
 import matplotlib.pyplot as plt
 iters = np.linspace(1, max_iterations, max_iterations)
 
+if n_sensors > 1:
+    sensors_s = str(n_sensors) + ' sensors '
+else:
+    sensors_s = ''
 ## one Np
 out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
 for bb_gt in range(len(beta_gt_factor)):
     beta0_factor = beta_gt_factor[bb_gt] + beta0_diff
     for bb in range(len(beta0_diff)):
-        diff      = np.squeeze( radiance_gt[0][bb_gt] * np.ones(algo_radiance[0][bb_gt][bb].shape) - algo_radiance[0][bb_gt][bb] )
+        diff = 0
+        for ss in range(n_sensors):
+            diff += np.squeeze( radiance_gt[ss][0][bb_gt] * np.ones(algo_radiance[ss][0][bb_gt][bb].shape) - algo_radiance[ss][0][bb_gt][bb] )
         cost      = 0.5 * diff**2
         tmp       = cost_gradient[0][bb_gt][bb]
-        gradient  = (np.mean(np.squeeze(np.mean(tmp, 2)), 1))
+        gradient = np.mean(np.mean(tmp, 2), 1)
         betas_err = abs(betas[0][bb_gt][bb] - beta_gt_factor[bb_gt]) / beta_gt_factor[bb_gt] * 100
 
         plt.figure(figsize=(19,9))    
@@ -264,7 +273,7 @@ for bb_gt in range(len(beta_gt_factor)):
         plt.suptitle('IID, Original beta = ' + str(beta_gt_factor[bb_gt]) + ', starting with beta0 = ' + str(beta0_factor[bb]) + ', Np = ' + str(Np_vector[0]), fontweight='bold')
         #plt.show()
         
-        out_name = 'independent grad and fwd Np '+ str(Np_vector[0]) + ' adam unknown 1 beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + '.png'
+        out_name = sensors_s + 'independent grad and fwd Np '+ str(Np_vector[0]) + ' adam unknown 1 beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + '.png'
         plt.savefig(out_path + out_name, dpi=300)
 
 ## several Nps
@@ -287,7 +296,7 @@ out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
                 #diff[np_i]      = np.squeeze(algo_radiance[3 * np_p + np_i][bb_gt][bb] - radiance_gt[3 * np_p + np_i][bb_gt] * np.ones(algo_radiance[3 * np_p + np_i][bb_gt][bb].shape))
                 #cost[np_i]      = 0.5 * diff[np_i]**2
                 #tmp[np_i]       = cost_gradient[3 * np_p + np_i][bb_gt][bb]
-                #gradient[np_i]  = (np.mean(np.squeeze(np.mean(tmp[np_i], 2)), 1)) * diff[np_i]
+                #gradient[np_i]  = (np.mean(np.squeeze(np.mean(tmp[np_i], 2)), 1))
                 #betas_err[np_i] = abs(betas[3 * np_p + np_i][bb_gt][bb] - beta_gt_factor[bb_gt]) / beta_gt_factor[bb_gt] * 100
             
                 #plt.subplot(3, 3, 3 * np_i + 1)

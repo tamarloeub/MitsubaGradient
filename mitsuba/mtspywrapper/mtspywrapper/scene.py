@@ -123,10 +123,14 @@ class pyScene(object):
         new_scene.configure_scene()
         return new_scene
     
-    def copy_scene_with_different_sensor_position(self, origin, target, up):
+    def copy_scene_with_different_sensor_position(self, origin, target, up, nSamples=None):
         assert (self._scene_set is True), "Can't copy unset scene"
+        if nSamples is None:
+            sampler = self._sensor.get_sampler()
+            nSamples = sampler.get_sample_count()
+            
         new_scene = self.copy_scene()        
-        new_scene.set_sensor_film_sampler(origin, target, up)
+        new_scene.set_sensor_film_sampler(origin, target, up, nSamples)
         new_scene.configure_scene()
         return new_scene        
 
