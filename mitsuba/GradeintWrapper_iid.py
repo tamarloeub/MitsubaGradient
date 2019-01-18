@@ -94,10 +94,10 @@ Np_vector     = np.array([512]) * 128
 scene_gt      = [ None ] * n_sensors # create an empty list
 algo_scene    = [ None ] * n_sensors # create an empty list
 sensors_pos   = [ None ] * n_sensors # create an empty list
-radiance_gt   = np.zeros((n_sensors, len(Np_vector), len(beta_gt_factor), 1))
-algo_radiance = np.zeros((n_sensors, len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations))
+I_gt          = np.zeros((n_sensors, len(Np_vector), len(beta_gt_factor), 1))
+I_algo        = np.zeros((n_sensors, len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations))
 betas         = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, n_unknowns))
-time_per_iter = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations))
+runtime       = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations))
 cost_gradient = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, grid_size, 3))
 
 f_multi         = True
@@ -125,7 +125,7 @@ for nps in range(len(Np_vector)):
         beta_gt        = scene_gt[0].get_scene_beta()
         
         # Render Ground Truth Scene
-        radiance_gt[0][nps][bb_gt], _ = render_scene(scene_gt[0]._scene, output_filename, n_cores)
+        I_gt[0][nps][bb_gt], _ = render_scene(scene_gt[0]._scene, output_filename, n_cores)
         
         ## Add more sensors
         sensors_pos[1] = { 'origin' : Point(0, 0, -3), 
@@ -143,9 +143,9 @@ for nps in range(len(Np_vector)):
         #scene_gt[3]    = scene_gt[0].copy_scene_with_different_sensor_position(sensors_pos[3]['origin'], sensors_pos[3]['target'], sensors_pos[3]['up'])
         
         
-        radiance_gt[1][nps][bb_gt], _ = render_scene(scene_gt[1]._scene, output_filename, n_cores)
-        #radiance_gt[2], _ = render_scene(scene_gt[2]._scene, output_filename, n_cores)
-        #radiance_gt[3], _ = render_scene(scene_gt[3]._scene, output_filename, n_cores)
+        I_gt[1][nps][bb_gt], _ = render_scene(scene_gt[1]._scene, output_filename, n_cores)
+        #I_gt[2], _ = render_scene(scene_gt[2]._scene, output_filename, n_cores)
+        #I_gt[3], _ = render_scene(scene_gt[3]._scene, output_filename, n_cores)
         
         print(beta_gt_factor[bb_gt])
         
@@ -164,28 +164,28 @@ for nps in range(len(Np_vector)):
             inner_grad_float = np.zeros((n_unknowns, 1))
             
             # Gradient descent loop
-            beta = np.copy(beta0)
+            beta  = np.copy(beta0)
+            start = time.time()
             
             for iteration in range(max_iterations):
                 #print(iteration)
                 print(beta)
-                start = time.time()
                 cost_grad = np.zeros((n_unknowns, 1))
                 
                 for ss in range(n_sensors):
                     # Create scene with given beta
-                    algo_scene[ss] = scene_gt[ss].copy_scene_with_different_density(beta)
-                    [ algo_radiance[ss][nps][bb_gt][bb][iteration], _ ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores)
-                    [ _, inner_grad ]    = render_scene(algo_scene[ss]._scene, output_filename, n_cores)                    
+                    algo_scene[ss]     = scene_gt[ss].copy_scene_with_different_density(beta)
+                    [ I_algo[ss][nps][bb_gt][bb][iteration], _ ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores)
+                    [ _, inner_grad ]  = render_scene(algo_scene[ss]._scene, output_filename, n_cores)                    
                     
                     # beta is not a Spectrum, for now:
                     # one unknown
                     inner_grad_float = np.mean(np.mean(inner_grad))
                     
-                    cost_grad += inner_grad_float * np.mean( radiance_gt[ss][nps][bb_gt] - algo_radiance[ss][nps][bb_gt][bb][iteration] )
+                    cost_grad += (-1)*inner_grad_float * np.mean( I_algo[ss][nps][bb_gt][bb][iteration] - I_gt[ss][nps][bb_gt] )
                     
-                #print(algo_radiance[bb_gt][bb][iteration])
-                    
+                #print(I_algo[bb_gt][bb][iteration])
+                
                 #cost_grad_mat = np.reshape(cost_grad, beta.shape, 'C') #CHECK - I thins it's column stack but it's not C style 'F' ot 'C'
                 cost_gradient[nps][bb_gt][bb][iteration] = cost_grad
                 cost_grad_mat = np.ones(beta.shape) * cost_grad
@@ -210,24 +210,30 @@ for nps in range(len(Np_vector)):
                 end = time.time()
     
                 #if iteration == 0:
-                time_per_iter[nps][bb_gt][bb][iteration] = end - start 
+                runtime[nps][bb_gt][bb][iteration] = end - start 
                 #else:
-                    #time_per_iter[bb_gt][bb][iteration] = end - start + time_per_iter[bb_gt][bb][iteration - 1]
+                    #runtime[bb_gt][bb][iteration] = end - start + runtime[bb_gt][bb][iteration - 1]
                 # Print some statistics about the rendering process
                 #print(Statistics.getInstance().getStats())
             
 scheduler.stop()
     
-#print(algo_radiance)
+#print(I_algo)
 #print(betas)
 
 import matplotlib.pyplot as plt
 iters = np.linspace(1, max_iterations, max_iterations)
 
+if alpha is not 0.01:
+    alpha_s = ' alpha ' + str(alpha)
+else:
+    alpha_s = ''
+
 if n_sensors > 1:
     sensors_s = str(n_sensors) + ' sensors '
 else:
     sensors_s = ''
+    
 ## one Np
 out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
 for bb_gt in range(len(beta_gt_factor)):
@@ -235,10 +241,10 @@ for bb_gt in range(len(beta_gt_factor)):
     for bb in range(len(beta0_diff)):
         diff = 0
         for ss in range(n_sensors):
-            diff += np.squeeze( radiance_gt[ss][0][bb_gt] * np.ones(algo_radiance[ss][0][bb_gt][bb].shape) - algo_radiance[ss][0][bb_gt][bb] )
+            diff += np.squeeze( I_gt[ss][0][bb_gt] * np.ones(I_algo[ss][0][bb_gt][bb].shape) - I_algo[ss][0][bb_gt][bb] )
         cost      = 0.5 * diff**2
         tmp       = cost_gradient[0][bb_gt][bb]
-        gradient = np.mean(np.mean(tmp, 2), 1)
+        gradient  = np.mean(np.mean(tmp, 2), 1)
         betas_err = abs(betas[0][bb_gt][bb] - beta_gt_factor[bb_gt]) / beta_gt_factor[bb_gt] * 100
 
         plt.figure(figsize=(19,9))    
@@ -273,7 +279,7 @@ for bb_gt in range(len(beta_gt_factor)):
         plt.suptitle('IID, Original beta = ' + str(beta_gt_factor[bb_gt]) + ', starting with beta0 = ' + str(beta0_factor[bb]) + ', Np = ' + str(Np_vector[0]), fontweight='bold')
         #plt.show()
         
-        out_name = sensors_s + 'independent grad and fwd Np '+ str(Np_vector[0]) + ' adam unknown 1 beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + '.png'
+        out_name = 'fix grad ' + sensors_s + 'independent grad and fwd Np '+ str(Np_vector[0]) + ' adam unknown 1 beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + alpha_s +'.png'
         plt.savefig(out_path + out_name, dpi=300)
 
 ## several Nps
@@ -293,14 +299,14 @@ out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
             #plt.figure(figsize=(8,10))
             #for np_i in range(3):
                 ##numeric_grad[np_i] = np.gradient(cost)
-                #diff[np_i]      = np.squeeze(algo_radiance[3 * np_p + np_i][bb_gt][bb] - radiance_gt[3 * np_p + np_i][bb_gt] * np.ones(algo_radiance[3 * np_p + np_i][bb_gt][bb].shape))
+                #diff[np_i]      = np.squeeze(I_algo[3 * np_p + np_i][bb_gt][bb] - I_gt[3 * np_p + np_i][bb_gt] * np.ones(I_algo[3 * np_p + np_i][bb_gt][bb].shape))
                 #cost[np_i]      = 0.5 * diff[np_i]**2
                 #tmp[np_i]       = cost_gradient[3 * np_p + np_i][bb_gt][bb]
                 #gradient[np_i]  = (np.mean(np.squeeze(np.mean(tmp[np_i], 2)), 1))
                 #betas_err[np_i] = abs(betas[3 * np_p + np_i][bb_gt][bb] - beta_gt_factor[bb_gt]) / beta_gt_factor[bb_gt] * 100
             
                 #plt.subplot(3, 3, 3 * np_i + 1)
-                ##plt.plot(time_per_iter[bb_gt][bb], cost, '--',  marker='o', markersize=5)
+                ##plt.plot(runtime[bb_gt][bb], cost, '--',  marker='o', markersize=5)
                 #plt.plot(iters, cost[np_i], '--',  marker='o', markersize=5)
                 #plt.title('Cost, Np = ' + str(Np_vector[3 * np_p + np_i]), fontweight='bold')
                 ##plt.title('Cost value')
@@ -311,7 +317,7 @@ out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
                 #plt.xlim(left=0)
                         
                 #plt.subplot(3, 3, 3 * np_i + 2)
-                ##plt.plot(time_per_iter[bb_gt][bb], gradient, '--',  marker='o', markersize=5)
+                ##plt.plot(runtime[bb_gt][bb], gradient, '--',  marker='o', markersize=5)
                 #plt.plot(iters, gradient[np_i], '--',  marker='o', markersize=5)
                 ##plt.plot(iters, numeric_grad[np_i], 'r--',  marker='o', markersize=3)        
                 ##plt.title('Gradient value, Np = ' + str(Np_vector[3 * np_p + np_i]))
@@ -322,7 +328,7 @@ out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
                 #plt.xlim(left=0)
             
                 #plt.subplot(6, 3, 6 * np_i + 3)
-                ##plt.plot(time_per_iter[bb_gt][bb], betas[bb_gt][bb], '--',  marker='o', markersize=5)
+                ##plt.plot(runtime[bb_gt][bb], betas[bb_gt][bb], '--',  marker='o', markersize=5)
                 #plt.plot(iters, betas[3 * np_p + np_i][bb_gt][bb], '--',  marker='o', markersize=5)
                 #plt.title('Beta', fontweight='bold')
                 ##plt.ylabel('Beta')
@@ -332,7 +338,7 @@ out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plots/'
                 #plt.xlim(left=0)
             
                 #plt.subplot(6, 3, 6 * (np_i + 1))
-                ##plt.plot(time_per_iter[bb_gt][bb], betas_err, '--',  marker='o', markersize=5)
+                ##plt.plot(runtime[bb_gt][bb], betas_err, '--',  marker='o', markersize=5)
                 #plt.plot(iters, betas_err[np_i], '--',  marker='o', markersize=5)
                 ##plt.title('Beta error')
                 ##plt.xlabel('Running time [sec]')

@@ -165,7 +165,13 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 	if (!sensor->getFilm()->hasAlpha()) /* Don't compute an alpha channel if we don't have to */
 		queryType &= ~RadianceQueryRecord::EOpacity;
 
-	bool DEBUG_TAMAR = 0;
+	bool DEBUG_TAMAR = false;
+	//build densityDerivative
+	std::vector<Spectrum> densityDerivative = rRec.scene->getDensityDerivative();
+	std::fill(densityDerivative.begin(), densityDerivative.end(), Spectrum(0.0));
+
+//	int size_der = ;
+	std::vector<Spectrum> Smk(densityDerivative.size());
 
 	for (size_t i = 0; i<points.size(); ++i) {
 		Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
@@ -173,8 +179,6 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			break;
 
 		sampler->generate(offset);
-		//build densityDerivative
-		std::vector<Spectrum> densityDerivative = rRec.scene->getDensityDerivative();
 
 		if (DEBUG_TAMAR) {
 			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
@@ -185,6 +189,8 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 		for (size_t j = 0; j<sampler->getSampleCount(); j++) {
 			rRec.newQuery(queryType, sensor->getMedium());
 			Point2 samplePos(Point2(offset) + Vector2(rRec.nextSample2D()));
+
+			std::fill(Smk.begin(), Smk.end(), Spectrum(0.0));
 
 			if (needsApertureSample)
 				apertureSample = rRec.nextSample2D();
@@ -197,7 +203,7 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			sensorRay.scaleDifferential(diffScaleFactor);
 
 			bool print_out = false;
-//			if ((j ==  1) || (j == 2)) {
+//			if (j ==  0) {
 //				print_out = true;
 //				DEBUG_TAMAR = true;
 //			} else {
@@ -211,7 +217,17 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 				cout << "sample " << j << endl;
 			}
 
-			spec *= Li(sensorRay, rRec, densityDerivative, print_out);
+			spec *= Li(sensorRay, rRec, Smk, print_out);
+
+			if ((print_out) and (DEBUG_TAMAR)) {
+				for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
+					cout << Smk[i].toString() << endl;
+				}
+			}
+
+			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
+				densityDerivative[i] += Smk[i] * spec;
+			}
 
 			if ((print_out) and (DEBUG_TAMAR)) {
 				for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {

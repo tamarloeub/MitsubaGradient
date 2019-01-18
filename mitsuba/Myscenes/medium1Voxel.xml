@@ -8,17 +8,19 @@
 		<string name="method" value="woodcock"/>
 
 		<volume name="density" type="gridvolume">
-			<string name="filename" value="2VoxelMedium_beta0.9.vol"/>
+			<string name="filename" value="2VoxelMedium_beta1.vol"/>
 		</volume>
 
 		<volume name="albedo" type="constvolume">
 			<spectrum name="value" value="1"/>
 		</volume>
 		
-    <float name="scale" value="1"/>
+    <float name="scale" value="10"/>
 
 		<phase type="hg">
-      <float name="g" value="0.85"/>                                                               
+      <volume name="g" type="constvolume">
+        <float name="value" value="0.85"/>
+      </volume>                                                
 		</phase> 
 	</medium>
  

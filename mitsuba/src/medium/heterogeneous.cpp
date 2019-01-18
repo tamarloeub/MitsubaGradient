@@ -411,7 +411,7 @@ public:
 				}
 			}
 
-			if (DEBUG_TAMAR){
+			if ((DEBUG_TAMAR) && (print_out)) {
 				cout << "p curr = " << p.toString() << " step = " << i << endl;
 				for(std::vector<int>::size_type j = 0; j != inDev.size(); j++) {
 					cout << "inDev.at(" << j << ") = " << inDev.at(j) << endl;
@@ -425,7 +425,7 @@ public:
 
 			Float densityAtT = lookupDensity(p, ray.d) * m_scale;
 			Float factor;
-			if ( ( (i == nSteps) || (isDirectRay == false) ) && (densityAtT > 0) ) {
+			if ( (i == nSteps) && (isDirectRay == false) && (densityAtT > 0) ) {
 				// calculating :  inDev *= (1 / betaAtT -stepSize )
 //				std::transform( inDev.begin(), inDev.end(), inDev.begin(), std::bind1st(std::multiplies<float>(), ( 1 / densityAtT - stepSize )) );
 				factor = ( 1 / densityAtT - stepSize );
@@ -437,7 +437,12 @@ public:
 			}
 
 			std::transform( inDev.begin(), inDev.end(), inDev.begin(), std::bind1st(std::multiplies<float>(), factor ) );
-
+			if ((DEBUG_TAMAR) && (print_out)) {
+				for(std::vector<int>::size_type j = 0; j != inDev.size(); j++) {
+					cout << "inDev.at(" << j << ") = " << inDev.at(j) << " ; " << factor << "( -stepSize ) = " << ( -stepSize ) << "( 1 / densityAtT - stepSize ) = " << ( 1 / (lookupDensity(p, ray.d) * m_scale) - stepSize ) << endl;
+				}
+				cout << endl;
+			}
 //			for(std::vector<int>::size_type j = 0; j != inDev.size(); j++) {
 //				if (std::isnan(inDev[j])){
 //					cout << "inDev[j] = " << inDev[j] << endl;
@@ -451,6 +456,12 @@ public:
 //				}
 //			}
 			mRec.scoreVals.insert(mRec.scoreVals.end(), inDev.begin(), inDev.end());
+			if ((DEBUG_TAMAR) && (print_out)) {
+				for(std::vector<int>::size_type j = 0; j != mRec.scoreVals.size(); j++) {
+					cout << "mRec.scoreVals.at(" << j << ") = " << mRec.scoreVals.at(j) << endl;
+				}
+				cout << endl;
+			}
 
 //			#if defined(HETVOL_STATISTICS)
 //				++avgRayMarchingStepsTransmittance;
@@ -907,15 +918,15 @@ public:
 
 					derivateDensity(ray, mRec, false, print_out);
 
-					if ((DEBUG_TAMAR) and (print_out)) {
-						cout << "sample dist:" << endl;
-						cout << "point in space : (" << p[0] << ", " << p[1] << ", " << p[2] << ")" << endl;
-						cout <<  "size of mRec.scoreVals = " << mRec.scoreVals.size() << endl;
-						for(std::vector<int>::size_type i = 0; i != mRec.scoreVals.size(); i++) {
-						    cout << "mRec.derivative[" << mRec.scoreIndxs[i] << "] = "
-						    		<< mRec.scoreVals[i] << endl;
-						}
-					}
+//					if ((DEBUG_TAMAR) and (print_out)) {
+//						cout << "sample dist:" << endl;
+//						cout << "point in space : (" << p[0] << ", " << p[1] << ", " << p[2] << ")" << endl;
+//						cout <<  "size of mRec.scoreVals = " << mRec.scoreVals.size() << endl;
+//						for(std::vector<int>::size_type i = 0; i != mRec.scoreVals.size(); i++) {
+//						    cout << "mRec.derivative[" << mRec.scoreIndxs[i] << "] = "
+//						    		<< mRec.scoreVals[i] << endl;
+//						}
+//					}
 
 					mRec.medium = this;
 					success = true;

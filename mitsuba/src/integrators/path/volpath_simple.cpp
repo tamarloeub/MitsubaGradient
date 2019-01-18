@@ -157,7 +157,7 @@ public:
 //						cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 //					}
 
-					densityDerivative[mRec.scoreIndxs[i]] += throughput * mRec.scoreVals[i];
+					densityDerivative[mRec.scoreIndxs[i]] += Spectrum(mRec.scoreVals[i]); //throughput * mRec.scoreVals[i];
 				}
 				if ((print_out) and (DEBUG_TAMAR)) {
 					for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
@@ -193,7 +193,7 @@ public:
 								cout << "LE:" << endl;
 								cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 							}
-							densityDerivative[mdRec.scoreIndxs[i]] += throughput * mdRec.scoreVals[i] * phaseVal;
+							densityDerivative[mdRec.scoreIndxs[i]] += Spectrum(mdRec.scoreVals[i] * phaseVal);//throughput * mdRec.scoreVals[i] * phaseVal;
 							if (print_out)
 								cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 						}

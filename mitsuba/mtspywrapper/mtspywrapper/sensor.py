@@ -27,6 +27,16 @@ class pySampler(object):
         })
         return sample_str
     
+    def to_dict(self):
+        dictionary = {
+            'type'    : self.get_type(),
+            'integer' : {
+                'name'  : 'sampleCount',
+                'value' : self.get_sample_count()
+            }
+        }
+        return dictionary    
+    
 class pyFilm(object):
     def __init__(self):
         self._type       = 'mfilm'
@@ -70,6 +80,26 @@ class pyFilm(object):
                 'type'        : self.get_type()
             })
         return film_str
+
+    def to_dict(self):
+        if self._width is not None:
+            if self._fileFormat is not None:
+                dictionary = {
+                    'type' : self.get_type()
+                }
+            else:
+                dictionary = {
+                    'type'   : self.get_type(),
+                    'width'  : self._width,
+                    'height' : self._height
+                }
+
+        else:
+            dictionary = {
+                'type'        : self.get_type()
+            }
+        return dictionary        
+
 
 class pySensor(object):
     def __init__(self):
@@ -126,7 +156,23 @@ class pySensor(object):
             'sampler' : sampler.sample_to_mitsuba()
         })
         return sensor_str
-    
+
+    def to_dict(self):
+        world_point = self.get_world_points()        
+        dictionary = {
+            'type'      : self.get_sensor_type(),
+            'transform' : {
+                'name'   : 'toWorld',
+                'lookat' : {
+                    'origin' : str(world_point['origin']).strip(']['),
+                    'target' : str(world_point['target']).strip(']['),
+                    'up'     : str(world_point['up']).strip('][')
+                }
+            },
+            'sampler' : self._sampler.to_dict(),
+            'film'    : self._film.to_dict()
+        }
+        return dictionary    
     
 class pyParallelRaySensor(pySensor):
     

@@ -3,6 +3,9 @@ import mitsuba
 import mitsuba.core 
 from mitsuba.render import Scene
 from mtspywrapper import *
+import xml.etree.ElementTree as ET
+from xml.dom.minidom import parseString 
+
 
 class pyScene(object):
     def __init__(self):
@@ -43,14 +46,15 @@ class pyScene(object):
             'intensity' : Spectrum(1)
         })
             
-    def set_medium(self, beta):    
+    def set_medium(self, beta, bounding_box=None):    
         # Create medium with bounding box
         self._medium = pyMedium()
         self._medium.set_phase(0.85)
         self._medium.set_albedo(1)
     
         # Define the extinction field (\beta) in [km^-1]
-        bounding_box = [-1, -1, -1, 1, 1, 1]   # [xmin, ymin, zmin, xmax, ymax, zmax] in km units 
+        if bounding_box is None:
+            bounding_box = [-1, -1, -1, 1, 1, 1]   # [xmin, ymin, zmin, xmax, ymax, zmax] in km units 
         
         beta_parameter = 0.9
         if isinstance(beta, int):
@@ -68,21 +72,21 @@ class pyScene(object):
     
         self._medium.set_density(beta, bounding_box)   
         
-    def set_scene(self, beta=(), origin=None, target=None, up=None, nSamples=4096):
+    def set_scene(self, beta=(), origin=None, target=None, up=None, nSamples=4096, bounding_box=None):
         if (origin is None) and (target is None) and (up is None):
             origin = Point(0, 0, 3)
             target = Point(0, 0, 1)
             up     = Vector(1, 0, 0)    
         else:
-            assert (origin is not None) and (target is not None) or (up is not None), "One of teh toWorld points is not define (origin \ target \ up)"
+            assert (origin is not None) and (target is not None) or (up is not None), "One of the toWorld points is not define (origin \ target \ up)"
             
         self.set_sensor_film_sampler(origin, target, up, nSamples)        
         self.set_integrator()
         self.set_emitter()
-        self.set_medium(beta)
+        self.set_medium(beta, bounding_box)
         self._scene_set = True
         
-    def configure_scene(self):            
+    def configure_scene(self, scene_type='smallMedium'):            
         # Set the sensor, film & sample generator
         self._scene.addChild(self._sensor.sensor_to_mitsuba())        
     
@@ -93,18 +97,18 @@ class pyScene(object):
         self._scene.addChild(self._emitter_str)
         
         # Set bounding box
-        self._scene.addChild(self._medium.bounding_box_to_mitsuba())    
+        self._scene.addChild(self._medium.bounding_box_to_mitsuba(scene_type))    
     
         # Set medium
-        self._scene.addChild(self._medium.medium_to_mitsuba())  
+        self._scene.addChild(self._medium.medium_to_mitsuba(scene_type))  
             
         self._scene.configure()        
         
         return self._scene
     
-    def create_new_scene(self, beta=(), origin=None, target=None, up=None, nSamples=4096):
-        self.set_scene(beta, origin, target, up, nSamples)
-        return self.configure_scene()
+    def create_new_scene(self, beta=(), origin=None, target=None, up=None, nSamples=4096, scene_type='smallMedium', bounding_box=None):
+        self.set_scene(beta, origin, target, up, nSamples, bounding_box)
+        return self.configure_scene(scene_type)
         
     def copy_scene(self):
         new_scene = pyScene()
@@ -134,3 +138,70 @@ class pyScene(object):
         new_scene.configure_scene()
         return new_scene        
 
+    def emitter_to_dict(self): ##update
+        dictionary = {
+            'type'   : 'directional',
+            'vector' : {
+                'name' : 'direction',
+                'x'    : '0',
+                'y'    : '0',
+                'z'    : '-1'
+            },
+            'spectrum' : {
+                'name'  : 'irradiance',
+                'value' : '1'
+            }
+        }
+        return dictionary
+    
+    def integrator_to_dict(self):
+        dictionary = {
+            'type'    : 'volpath_simple',
+            'integer' : {
+                'name'  : 'maxDepth',
+                'value' : '-1'
+            }
+        }
+        return dictionary      
+                             
+    def to_dict(self):
+        dictionary = {
+            'version'    : '0.5.0',
+            'medium'     : self._medium.to_dict(),
+            'shape'      : self._medium.bounding_to_dict(),
+            'sensor'     : self._sensor.to_dict(),
+            'emitter'    : self.emitter_to_dict(),
+            'integrator' : self.integrator_to_dict()                                
+        }
+        return dictionary
+    
+    def xml_rec(self, elem, dictionary):
+        for atr in dictionary.keys():
+            if type(atr) == tuple:
+                atr_temp = atr[0]
+            else:
+                atr_temp = atr
+                
+            if type(dictionary[atr]) == dict:
+                sub_elem = ET.SubElement(elem,atr_temp)
+                sub_elem = self.xml_rec(sub_elem,dictionary[atr])
+            else:
+                if type(dictionary[atr]) != str:
+                    value = str(dictionary[atr])
+                else:
+                    value = dictionary[atr]
+                elem.set(atr, value)
+        return elem
+    
+    def scene_to_xml(self):
+        filename  = os.path.realpath(self._medium._medium_path) + '/scene.xml'
+        f         = open(filename, 'w')         
+        root      = self.xml_rec(ET.Element("scene"), self.to_dict())
+        rough_str = ET.tostring(root, 'utf-8')
+        reparsed  = parseString(rough_str)
+        xml_txt   = reparsed.toprettyxml(indent="\t")
+        f.write(xml_txt)
+        f.close()
+        return filename
+    
+    

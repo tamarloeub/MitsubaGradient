@@ -7,7 +7,7 @@ clc
 path = what('../');
 path = path.path;
 % change density (range [0, 1]) to create the desired scene 
-density = 0.9;
+density = 1;
 
 % size of medium - in this case one voxel
 W = 2;

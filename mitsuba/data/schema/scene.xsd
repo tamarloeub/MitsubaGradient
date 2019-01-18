@@ -221,6 +221,7 @@
 				<xsd:choice minOccurs="0" maxOccurs="unbounded">
 					<xsd:group ref="objectGroup"/>
 					<xsd:element name="phase" type="phase"/>
+					<xsd:element name="volume" type="volume"/>					
 				</xsd:choice>
 			</xsd:extension>
 		</xsd:complexContent>

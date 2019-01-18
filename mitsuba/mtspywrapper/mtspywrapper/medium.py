@@ -153,7 +153,6 @@ class pyMedium(object):
                 
             self._phase = volume
             self.set_vol_file(volume, 'phase')
-            
         
     def set_volume(self, shape):    
         if shape == ():
@@ -301,6 +300,94 @@ class pyMedium(object):
                 'phase'     : self.phase_to_mitsuba()
             })            
         return medium    
+
+    def density_to_dict(self):
+        file_name  = os.path.realpath(self._files['density'])
+        dictionary = {
+            'name'   : 'density',
+            'type'   : 'gridvolume',
+            'string' : {
+                'name'  : 'filename',
+                'value' : file_name
+            }
+        }
+        return dictionary
+
+    def phase_to_dict(self):
+        volume = np.array(self.get_phase_data())
+        if volume.shape == ():
+            dictionary = {
+                'type'   : 'hg',
+                'volume' : {
+                    'name'  : 'g',
+                    'type'  : 'constvolume',
+                    'float' : {
+                        'name'  : 'value',
+                        'value' : float(volume)
+                    }
+                }
+            }
+            
+        else:
+            file_name  = os.path.realpath(self._files['phase'])
+            dictionary = {
+                'type'   : 'hg',
+                'volume' : {
+                    'name'   : 'g',
+                    'type'   : 'gridvolume',
+                    'string' : {
+                        'name'  : 'filename',
+                        'value' : file_name
+                    }
+                }
+            }
+        return dictionary
+
+    def albedo_to_dict(self):
+        volume     = self.get_albedo_data()
+        dictionary = {
+            'name'     : 'albedo',
+            'type'     : 'constvolume',
+            'spectrum' : {
+                'name'  : 'value',
+                'value' : float(volume)
+            }
+        }
+        return dictionary
+
+    def bounding_to_dict(self):
+        _id        = 'OneVoxel'
+        dictionary = {
+            'type'   : 'obj',
+            'string' : {
+                'name'  : 'filename',
+                'value' : os.path.realpath(self._files['bounding_box'])
+            },
+            'ref':{
+                'name' : 'interior',
+                'id'   : _id
+            }
+        }
+        return dictionary
+    
+    def to_dict(self):
+        _id        = 'OneVoxel'
+        dictionary = {
+            'type'  : 'heterogeneous',
+            'id'    : _id,
+            'string': {
+                'name'  : 'method',
+                'value' : 'woodcock'
+            },
+            ('volume',0) : self.density_to_dict(),
+            ('volume',1) : self.albedo_to_dict(),
+            'phase'      : self.phase_to_dict(),
+            'float'      : {
+                'name'  : 'scale',
+                'value' : self._scale
+            }
+        }
+        return dictionary
     
     @property
     def scale(self):
