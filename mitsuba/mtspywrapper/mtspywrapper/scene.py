@@ -73,13 +73,13 @@ class pyScene(object):
         self._medium.set_density(beta, bounding_box)   
         
     def set_scene(self, beta=(), origin=None, target=None, up=None, nSamples=4096, bounding_box=None):
-        if (origin is None) and (target is None) and (up is None):
+        if origin is None:
             origin = Point(0, 0, 3)
+        if target is None:
             target = Point(0, 0, 1)
+        if up     is None:
             up     = Vector(1, 0, 0)    
-        else:
-            assert (origin is not None) and (target is not None) or (up is not None), "One of the toWorld points is not define (origin \ target \ up)"
-            
+
         self.set_sensor_film_sampler(origin, target, up, nSamples)        
         self.set_integrator()
         self.set_emitter()
