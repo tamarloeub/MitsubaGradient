@@ -46,10 +46,13 @@ class pyScene(object):
             'intensity' : Spectrum(1)
         })
             
-    def set_medium(self, beta, bounding_box=None):    
+    def set_medium(self, beta, bounding_box=None, g=None):    
         # Create medium with bounding box
         self._medium = pyMedium()
-        self._medium.set_phase(0.85)
+        if g is None:
+            g = 0.85
+            
+        self._medium.set_phase(g)
         self._medium.set_albedo(1)
     
         # Define the extinction field (\beta) in [km^-1]
@@ -72,7 +75,7 @@ class pyScene(object):
     
         self._medium.set_density(beta, bounding_box)   
         
-    def set_scene(self, beta=(), origin=None, target=None, up=None, nSamples=4096, bounding_box=None):
+    def set_scene(self, beta=(), origin=None, target=None, up=None, nSamples=4096, bounding_box=None, g=None):
         if origin is None:
             origin = Point(0, 0, 3)
         if target is None:
@@ -83,7 +86,7 @@ class pyScene(object):
         self.set_sensor_film_sampler(origin, target, up, nSamples)        
         self.set_integrator()
         self.set_emitter()
-        self.set_medium(beta, bounding_box)
+        self.set_medium(beta, bounding_box, g)
         self._scene_set = True
         
     def configure_scene(self, scene_type='smallMedium'):            
@@ -106,8 +109,8 @@ class pyScene(object):
         
         return self._scene
     
-    def create_new_scene(self, beta=(), origin=None, target=None, up=None, nSamples=4096, scene_type='smallMedium', bounding_box=None):
-        self.set_scene(beta, origin, target, up, nSamples, bounding_box)
+    def create_new_scene(self, beta=(), origin=None, target=None, up=None, nSamples=4096, scene_type='smallMedium', bounding_box=None, g=None):
+        self.set_scene(beta, origin, target, up, nSamples, bounding_box, g)
         return self.configure_scene(scene_type)
         
     def copy_scene(self):

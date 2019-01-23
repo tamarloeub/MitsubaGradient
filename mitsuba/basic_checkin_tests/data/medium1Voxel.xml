@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.5.0">
+	<integrator type="volpath_simple">
+		<integer name="maxDepth" value="-1"/>
+	</integrator>
+ 
+ 	<medium type="heterogeneous" id="oneVoxel">
+		<string name="method" value="woodcock"/>
+
+		<volume name="density" type="gridvolume">
+			<string name="filename" value="2VoxelMedium_beta1.vol"/>
+		</volume>
+
+		<volume name="albedo" type="constvolume">
+			<spectrum name="value" value="1"/>
+		</volume>
+		
+    <float name="scale" value="10"/>
+
+		<phase type="hg">
+      <volume name="g" type="constvolume">
+        <float name="value" value="0.85"/>
+      </volume>                                                
+		</phase> 
+	</medium>
+ 
+	<shape type="obj">
+		<string name="filename" value="bounds_padded.obj"/>
+		<ref name="interior" id="oneVoxel"/>
+	</shape>
+ 
+  <sensor type="radiancemeter">
+		<transform name="toWorld">
+			<lookat	origin="0, 0, 3" target="0, 0, 1"/>
+		</transform>
+
+		<sampler type="ldsampler">
+			<integer name="sampleCount" value="4096"/>
+		</sampler>
+   
+    <film type="mfilm"/>
+
+	</sensor>
+ 
+	<!--<sensor type="perspective">
+		<transform name="toWorld">
+			<lookat	target="0, 0, 0" origin="0  0  20"/>
+		</transform>
+
+		<sampler type="ldsampler">
+			<integer name="sampleCount" value="4096"/>
+		</sampler>
+
+		<film type="mfilm">
+			<integer name="height" value="100"/>
+			<integer name="width" value="100"/>
+		</film>
+    <ref name="interior" id="oneVoxel"/>
+	</sensor>-->
+
+	
+	<emitter type="directional">
+		<vector name="direction" x="0" y="0" z="-1"/>
+    <spectrum name="irradiance" value="1"/>
+	</emitter>
+
+</scene>
