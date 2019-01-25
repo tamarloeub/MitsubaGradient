@@ -11,7 +11,7 @@ class pySampler(object):
         
         
     def set_sampler(self, stype='ldsampler', sampleCount=4096):
-        self._type = stype
+        self._type        = stype
         self._sampleCount = sampleCount
         
     def get_type(self):
@@ -59,6 +59,12 @@ class pyFilm(object):
         
     def get_type(self):
         return self._type
+
+    def get_width(self):
+        return self._width
+    
+    def get_height(self):
+        return self._height
     
     def film_to_mitsuba(self):
         if self._width is not None:
@@ -93,7 +99,6 @@ class pyFilm(object):
                     'width'  : self._width,
                     'height' : self._height
                 }
-
         else:
             dictionary = {
                 'type'        : self.get_type()
@@ -105,38 +110,44 @@ class pySensor(object):
     def __init__(self):
         self._pmgr    = PluginManager.getInstance() 
         self._type    = None
+        self._fov     = None
         self._film    = pyFilm()
         self._sampler = pySampler()
         self._toWorld_dict = dict()
         self._toWorld_transform = None
     
-    def set_sensor_type(self, sensor_type):
+    def set_type(self, sensor_type):
         self._type = sensor_type
         
-    def get_sensor_type(self):
-        return self._type
+    def set_fov(self, fov):
+        self._type = fov        
     
     def set_film(self, ftype='mfilm', width=None, height=None, fileFormat=None):
         self._film.set_film(ftype, width, height, fileFormat)
     
-    def set_to_world(self, origin, target, up):
+    def set_to_world(self, points):
         self._toWorld_dict = {
-            'origin' : origin, 
-            'target' : target, 
-            'up'     : up
+            'origin' : points['origin'], 
+            'target' : points['target'], 
+            'up'     : points['up']
         }
         self._toWorld_transform = Transform.lookAt(
-                origin, # Camera origin
-                target, # Camera target
-                up )    # 'up' vector
-    
-    def get_film(self):
-        return self._film
+                points['origin'], # Camera origin
+                points['target'], # Camera target
+                points['up'] )    # 'up' vector
     
     def set_sampler(self, num_samples, sampler_type='ldsampler'):
         self._sampler.set_sampler(sampler_type, num_samples)
-        
-        
+
+    def get_film(self):
+        return self._film
+    
+    def get_type(self):
+        return self._type
+    
+    def get_fov(self):
+        return self._fov
+            
     def get_sampler(self):
         return self._sampler
     
@@ -149,29 +160,54 @@ class pySensor(object):
     def sensor_to_mitsuba(self):
         sampler = self.get_sampler()
         film    = self.get_film()
-        sensor_str = self._pmgr.create({
-            'type'    : self.get_sensor_type(),
-            'toWorld' : self.get_world_transform(),
-            'film'    : film.film_to_mitsuba(),
-            'sampler' : sampler.sample_to_mitsuba()
-        })
+        if self.get_fov() is not None:            
+            sensor_str = self._pmgr.create({
+                'type'    : self.get_type(),
+                'fov'     : self.get_fov(),
+                'toWorld' : self.get_world_transform(),
+                'film'    : film.film_to_mitsuba(),
+                'sampler' : sampler.sample_to_mitsuba()
+            })
+        else:
+            sensor_str = self._pmgr.create({
+                'type'    : self.get_type(),
+                'toWorld' : self.get_world_transform(),
+                'film'    : film.film_to_mitsuba(),
+                'sampler' : sampler.sample_to_mitsuba()
+            })
         return sensor_str
 
     def to_dict(self):
-        world_point = self.get_world_points()        
-        dictionary = {
-            'type'      : self.get_sensor_type(),
-            'transform' : {
-                'name'   : 'toWorld',
-                'lookat' : {
-                    'origin' : str(world_point['origin']).strip(']['),
-                    'target' : str(world_point['target']).strip(']['),
-                    'up'     : str(world_point['up']).strip('][')
-                }
-            },
-            'sampler' : self._sampler.to_dict(),
-            'film'    : self._film.to_dict()
-        }
+        world_point = self.get_world_points()  
+        if self.get_fov() is not None:
+            dictionary = {
+                'type'      : self.get_type(),
+                'fov'       : self.get_fov(),
+                'transform' : {
+                    'name'   : 'toWorld',
+                    'lookat' : {
+                        'origin' : str(world_point['origin']).strip(']['),
+                        'target' : str(world_point['target']).strip(']['),
+                        'up'     : str(world_point['up']).strip('][')
+                    }
+                },
+                'sampler' : self._sampler.to_dict(),
+                'film'    : self._film.to_dict()
+            }              
+        else :
+            dictionary = {
+                'type'      : self.get_type(),
+                'transform' : {
+                    'name'   : 'toWorld',
+                    'lookat' : {
+                        'origin' : str(world_point['origin']).strip(']['),
+                        'target' : str(world_point['target']).strip(']['),
+                        'up'     : str(world_point['up']).strip('][')
+                    }
+                },
+                'sampler' : self._sampler.to_dict(),
+                'film'    : self._film.to_dict()
+            }            
         return dictionary    
     
 class pyParallelRaySensor(pySensor):
@@ -185,7 +221,7 @@ class pyParallelRaySensor(pySensor):
             height = medium.shape[1]
         except IndexError:
             height = 1
-        self.set_sensor_type('orthographic')
+        self.set_type('orthographic')
         self.set_world_transform(0.0, 0.0)
         self.set_film(width, height)
 

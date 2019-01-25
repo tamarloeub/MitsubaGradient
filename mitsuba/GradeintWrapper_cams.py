@@ -87,26 +87,11 @@ def render_scene(scene, output_filename, n_cores):
     return radiance, inner_grad
 
 
-### Loading from an XML file
-#def sceneLoadFromFile(xml_filename):
-    ## Get a reference to the thread's file resolver
-    #fileResolver = Thread.getThread().getFileResolver()
-    
-    ## Register any searchs path needed to load scene resources (optional)
-    #fileResolver.appendPath('Myscenes')
-    
-    ## Load the scene from an XML file
-    #scene        = SceneHandler.loadScene(fileResolver.resolve(xml_filename), StringMap())    
-    #return scene
-#xml_filename = "medium1Voxel.xml"
-#scene        = sceneLoadFromFile(xml_filename)
-
 ## Parameters
 # algorithm parameters
 max_iterations = 400 * 3
-#step_size      = 5#.5
 n_unknowns     = 4
-beta_gt_factor = np.array([2, 5, 10]) #np.array([1, 2, 5, 10])
+beta_gt_factor = np.array([2])#, 5, 10]) #np.array([1, 2, 5, 10])
 beta0_diff     = np.array([1, 2, 4]) #np.array([-0.5, 0, 0.5, 2, 5, 1, 2, 5])
 
 grid_size = 8
@@ -133,7 +118,7 @@ betas          = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff),
 beta_4unknowns = np.zeros((len(Np_vector), len(beta_gt_factor), n_unknowns))
                           
 f_multi         = True
-output_filename = 'renderedResult'
+output_filename = 'renderedResult2'
 
 if f_multi: # Set parallel job or run on 1 cpu only
     n_cores = multiprocessing.cpu_count()
@@ -146,7 +131,7 @@ for i in range(0, n_cores):
     scheduler.registerWorker(LocalWorker(i, 'wrk%i' % i))
 scheduler.start()
 
-additional_str = ''
+additional_str = ' camera'
 
 for nps in range(len(Np_vector)):
     for bb_gt in range(len(beta_gt_factor)):
@@ -165,8 +150,8 @@ for nps in range(len(Np_vector)):
         ## 1 unknown
         #scene_gt[0].create_new_scene(beta=beta_gt_factor[bb_gt], origin=Point(0, 3, 0), target=None, up=Vector(0, 0, 1), nSamples=Np_vector[nps])
         #beta_gt        = scene_gt[0].get_scene_beta()
-        ## 4 unknowns        
-        scene_gt[0].create_new_scene(beta=beta_gt, nSamples=Np_vector[nps])
+        ## 4 unknowns     
+        scene_gt[0].create_new_scene(beta=beta_gt, sensorType='prespective', nSamples=Np_vector[nps], width=2, height=2)
         sensors_pos[0] = scene_gt[0]._sensor.get_world_points()
         
         # Render Ground Truth Scene
@@ -322,7 +307,7 @@ else:
     alpha_s = ''
 
 if n_sensors > 1:
-    sensors_s = str(n_sensors) + ' sensors '
+    sensors_s = ' ' + str(n_sensors) + ' sensors'
 else:
     sensors_s = ''
     
@@ -373,7 +358,7 @@ else:
         #plt.suptitle('Original beta = ' + str(beta_gt_factor[bb_gt]) + ', starting with beta0 = ' + str(beta0_factor[bb]) + ', Np = ' + str(Np_vector[0]), fontweight='bold')
         ##plt.show()
         
-        #out_name = 'fix grad ' + sensors_s + 'dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam unknown 1 beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + alpha_s + additional_str +'.png'
+        #out_name = 'fix grad' + sensors_s + ' dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam unknown 1 beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(beta0_factor[bb]) + alpha_s + additional_str +'.png'
         #plt.savefig(out_path + out_name, dpi=300)
 
 ## 4 unknowns:
@@ -427,7 +412,7 @@ for bb_gt in range(len(beta_gt_factor)):
             plt.suptitle('Original beta = ' + str(beta_4unknowns[0][bb_gt][un]) + ', starting with beta0 = ' + str(bb0) + ', Np = ' + str(Np_vector[0]) + ', unknown ' + str(un + 1), fontweight='bold')
             #plt.show()
             
-            out_name = 'fix grad 4 unknowns ' + sensors_s + 'dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(bb0) + alpha_s + additional_str + '_' + str(un + 1) +'.png'
+            out_name = 'fix grad 4 unknowns' + sensors_s + ' dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(bb0) + alpha_s + additional_str + '_' + str(un + 1) +'.png'
             plt.savefig(out_path + out_name, dpi=300)
 
 ### several Nps
