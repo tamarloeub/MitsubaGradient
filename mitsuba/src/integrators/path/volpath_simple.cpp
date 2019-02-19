@@ -99,8 +99,6 @@ public:
 		   intersection has already been provided). */
 		rRec.rayIntersect(ray);
 		Spectrum throughput(1.0f);
-//		Spectrum throughput_grad(1.0f);	// Tamar
-
 
 		if (m_maxDepth == 1)
 			rRec.type &= RadianceQueryRecord::EEmittedRadiance;
@@ -113,32 +111,35 @@ public:
 		 */
 
 		/* debug */
-//		bool DEBUG_TAMAR = 1;
 		bool DEBUG_TAMAR = print_out;
 		if (DEBUG_TAMAR)
 			cout << "start:" << endl;
+
+//		Spectrum throuTmp = Spectrum(-1.0); //T!
+//		Spectrum LiRRTmp = Spectrum(0.0);//T!
+//		bool RR_f = false; //T!
+		Float q = 1.0;
 
 		while (rRec.depth <= m_maxDepth || m_maxDepth < 0) {
 			/* ==================================================================== */
 			/*                 Radiative Transfer Equation sampling                 */
 			/* ==================================================================== */
-
 			if (rRec.medium && rRec.medium->sampleDistance(Ray(ray, 0, its.t), mRec, rRec.sampler, print_out)) {
 				/* Sample the integral
 				   \int_x^y tau(x, x') [ \sigma_s \int_{S^2} \rho(\omega,\omega') L(x,\omega') d\omega' ] dx'
 				*/
-//				if (DEBUG_TAMAR) {
-//					cout <<  "size of mRec.scoreVals = " << mRec.scoreVals.size() << endl;
-//					for(std::vector<int>::size_type i = 0; i != mRec.scoreVals.size(); i++) {
-//					    cout << "mRec.derivative[" << mRec.scoreIndxs[i] << "] = "
-//					    		<< mRec.scoreVals[i] << endl;
+
+//				if (throuTmp[0] > 0.0){ //T!
+//					float diffThrou = (throuTmp[0] - throughput[0]) +(throuTmp[1] - throughput[1]) + (throuTmp[2] - throughput[2]); //T!
+//					if (diffThrou > 1e-6) {//T!
+//						cout << "difference in throughput = " << diffThrou << endl; //T!
+//						cout << "throuTmp = " << throuTmp.toString() << " throughput = " << throughput.toString() << endl; //T!
 //					}
-//				}
+//				} //T!
 
 				if (DEBUG_TAMAR) {
 					cout << ray.toString();
 					cout << "throughput: " << throughput.toString() << endl;
-//					cout << "throughput_grad: " << throughput_grad.toString() << endl;
 					cout << "mRec: [" << endl;
 					cout << " sigmaS = " <<  (mRec.sigmaS).toString() << endl;
 					cout << " pdfSuccess = " << mRec.pdfSuccess  << endl;
@@ -151,13 +152,7 @@ public:
 				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 				// build densityDerivative
 				for(std::vector<int>::size_type i = 0; i != mRec.scoreIndxs.size(); i++) {
-//					if ((print_out) and (DEBUG_TAMAR)) {
-//						cout << "Ray:" << endl;
-//						cout << "mRec.scoreVals[" << i << "] = " << mRec.scoreVals[i] << " at index " << mRec.scoreIndxs[i] << endl;
-//						cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
-//					}
-
-					densityDerivative[mRec.scoreIndxs[i]] += Spectrum(mRec.scoreVals[i]); //throughput * mRec.scoreVals[i];
+					densityDerivative[mRec.scoreIndxs[i]] += Spectrum(mRec.scoreVals[i] / q);
 				}
 				if ((print_out) and (DEBUG_TAMAR)) {
 					for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
@@ -165,15 +160,13 @@ public:
 					}
 				}
 
-				// Tamar
-//				throughput_grad *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
-
 				/* ==================================================================== */
 				/*                     Direct illumination sampling                     */
 				/* ==================================================================== */
 
 				/* Estimate the single scattering component if this is requested */
 				if (rRec.type & RadianceQueryRecord::EDirectMediumRadiance) {
+					// Tamar - goes into this section in multiple scattering as well
 					DirectSamplingRecord dRec(mRec.p, mRec.time);
 					int maxInteractions = m_maxDepth - rRec.depth - 1;
 
@@ -187,13 +180,16 @@ public:
 						Li += throughput * value * phaseVal;
 						MediumSamplingRecord mdRec;
 						RayDifferential rayD = RayDifferential(mRec.p, mRec.orientation ,mRec.time);
+
 						rRec.medium->derivateDensity(rayD, mdRec, true, print_out);
+
 						for(std::vector<int>::size_type i = 0; i != mdRec.scoreIndxs.size(); i++) {
 							if (print_out) {
 								cout << "LE:" << endl;
 								cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 							}
-							densityDerivative[mdRec.scoreIndxs[i]] += Spectrum(mdRec.scoreVals[i] * phaseVal);//throughput * mdRec.scoreVals[i] * phaseVal;
+
+							densityDerivative[mdRec.scoreIndxs[i]] += Spectrum(mdRec.scoreVals[i] / q);
 							if (print_out)
 								cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 						}
@@ -215,8 +211,6 @@ public:
 				if (phaseVal == 0)
 					break;
 				throughput *= phaseVal;
-				// Tamar
-//				throughput_grad *= (1 - mRec.beta * mRec.p) / mRec.beta;
 
 				/* Trace a ray in this direction */
 				ray = Ray(mRec.p, pRec.wo, ray.time);
@@ -224,18 +218,22 @@ public:
 				scene->rayIntersect(ray, its);
 				nullChain = false;
 				scattered = true;
+
 			} else {
 				/* Sample
 					tau(x, y) * (Surface integral). This happens with probability mRec.pdfFailure
 					Account for this and multiply by the proper per-color-channel transmittance.
 				*/
-//				if (DEBUG_TAMAR)
-//					cout << ray.toString();
 
-				if (rRec.medium)
+//				Spectrum LiTmp = Li; //T!
+//				throuTmp = throughput; //T!
+
+				if (rRec.medium) {
 					throughput *= mRec.transmittance / mRec.pdfFailure;
-					// Tamar
-//					throughput_grad *= mRec.transmittance / mRec.pdfFailure;
+//					Spectrum factor = mRec.transmittance / mRec.pdfFailure; //T!
+//					if ((factor[0]!= 1.0) and (factor[1]!=1.0) and (factor[2]!=1.0))
+//						cout << "factor = " <<  factor.toString() << endl;
+				}
 
 				if (!its.isValid()) {
 					/* If no intersection could be found, possibly return
@@ -255,25 +253,58 @@ public:
 							}
 						}
 						Li += value;
+//						float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
+//						if (diffLi > 1e-6) { //T!
+//							cout << "diff = " << diffLi << endl;
+//							cout << "If no intersection could be found, possibly return attenuated radiance from a background luminaire" << endl; //T!
+//							cout << "LiTmp = " << LiTmp.toString() << endl; //T!
+//							cout << "Li = " << Li.toString() << endl; //T!
+//						} //T!
 					}
+//					float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
+//					if (diffLi > 1e-6) { //T!
+//						cout << "If no intersection could be found" << endl; //T!
+//						cout << "LiTmp = " << LiTmp.toString() << endl; //T!
+//						cout << "Li = " << Li.toString() << endl; //T!
+//					} //T!
 					break;
 				}
 
 				/* Possibly include emitted radiance if requested */
 				if (its.isEmitter() && (rRec.type & RadianceQueryRecord::EEmittedRadiance)
-					&& (!m_hideEmitters || scattered))
+					&& (!m_hideEmitters || scattered)){
 					Li += throughput * its.Le(-ray.d);
+//					float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
+//					if (diffLi > 1e-6) { //T!
+//						cout << "Possibly include emitted radiance if requested" << endl; //T!
+//						cout << "LiTmp = " << LiTmp.toString() << endl; //T!
+//						cout << "Li = " << Li.toString() << endl; //T!
+//					} //T!
+				}
 
 				/* Include radiance from a subsurface integrator if requested */
-				if (its.hasSubsurface() && (rRec.type & RadianceQueryRecord::ESubsurfaceRadiance))
+				if (its.hasSubsurface() && (rRec.type & RadianceQueryRecord::ESubsurfaceRadiance)){
 					Li += throughput * its.LoSub(scene, rRec.sampler, -ray.d, rRec.depth);
+//					float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
+//					if (diffLi > 1e-6) { //T!
+//						cout << "Include radiance from a subsurface integrator if requested" << endl; //T!
+//						cout << "LiTmp = " << LiTmp.toString() << endl; //T!
+//						cout << "Li = " << Li.toString() << endl; //T!
+//					} //T!
+				}
 
 				/* Prevent light leaks due to the use of shading normals */
 				Float wiDotGeoN = -dot(its.geoFrame.n, ray.d),
 					  wiDotShN  = Frame::cosTheta(its.wi);
-				if (m_strictNormals && wiDotGeoN * wiDotShN < 0)
+				if (m_strictNormals && wiDotGeoN * wiDotShN < 0){
+//					float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
+//					if (diffLi > 1e-6) { //T!
+//						cout << "1 - Prevent light leaks due to the use of shading normals" << endl; //T!
+//						cout << "LiTmp = " << LiTmp.toString() << endl; //T!
+//						cout << "Li = " << Li.toString() << endl; //T!
+//					} //T!
 					break;
-
+				}
 				/* ==================================================================== */
 				/*                     Direct illumination sampling                     */
 				/* ==================================================================== */
@@ -298,8 +329,15 @@ public:
 						Float woDotGeoN = dot(its.geoFrame.n, dRec.d);
 						/* Prevent light leaks due to the use of shading normals */
 						if (!m_strictNormals ||
-							woDotGeoN * Frame::cosTheta(bRec.wo) > 0)
+							woDotGeoN * Frame::cosTheta(bRec.wo) > 0) {
 							Li += throughput * value * bsdf->eval(bRec);
+//							float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
+//							if (diffLi > 1e-6) { //T!
+//								cout << "Direct illumination - Prevent light leaks due to the use of shading normals" << endl; //T!
+//								cout << "LiTmp = " << LiTmp.toString() << endl; //T!
+//								cout << "Li = " << Li.toString() << endl; //T!
+//							} //T!
+						}
 					}
 				}
 
@@ -310,15 +348,24 @@ public:
 				/* Sample BSDF * cos(theta) */
 				BSDFSamplingRecord bRec(its, rRec.sampler, ERadiance);
 				Spectrum bsdfVal = bsdf->sample(bRec, rRec.nextSample2D());
-				if (bsdfVal.isZero())
+				if (bsdfVal.isZero()){
+//					cout << "bsdfVal = 0" << endl;
 					break;
+				}
 
 				/* Recursively gather indirect illumination? */
 				int recursiveType = 0;
 				if ((rRec.depth + 1 < m_maxDepth || m_maxDepth < 0) &&
-					(rRec.type & RadianceQueryRecord::EIndirectSurfaceRadiance))
+					(rRec.type & RadianceQueryRecord::EIndirectSurfaceRadiance)) {
+//					float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
+//					if (diffLi > 1e-6) { //T!
+//						cout << "diff = " << diffLi << endl;
+//						cout << "Recursively gather indirect illumination" << endl; //T!
+//						cout << "LiTmp = " << LiTmp.toString() << endl; //T!
+//						cout << "Li = " << Li.toString() << endl; //T!
+//					} //T!
 					recursiveType |= RadianceQueryRecord::ERadianceNoEmission;
-
+				}
 				/* Recursively gather direct illumination? This is a bit more
 				   complicated by the fact that this integrator can create connection
 				   through index-matched medium transitions (ENull scattering events) */
@@ -328,6 +375,12 @@ public:
 					(!(bRec.sampledType & BSDF::ENull) || nullChain)) {
 					recursiveType |= RadianceQueryRecord::EEmittedRadiance;
 					nullChain = true;
+//					float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
+//					if (diffLi > 1e-6) { //T!
+//						cout << "Recursively gather direct illumination" << endl; //T!
+//						cout << "LiTmp = " << LiTmp.toString() << endl; //T!
+//						cout << "Li = " << Li.toString() << endl; //T!
+//					} //T!
 				} else {
 					nullChain &= bRec.sampledType == BSDF::ENull;
 				}
@@ -357,17 +410,27 @@ public:
 			}
 
 			if (rRec.depth++ >= m_rrDepth) {
+				//Tamar - for now depth is always inf
 				/* Russian roulette: try to keep path weights equal to one,
 				   while accounting for the solid angle compression at refractive
 				   index boundaries. Stop with at least some probability to avoid
 				   getting stuck (e.g. due to total internal reflection) */
-
-				Float q = std::min(throughput.max() * eta * eta, (Float) 0.95f);
+//				LiRRTmp = Li; //T!
+				q = std::min(throughput.max() * eta * eta, (Float) 0.95f);
 				if (rRec.nextSample1D() >= q)
 					break;
 				throughput /= q;
+//				RR_f = true; //T!
 			}
 		}
+//		if (RR_f == true) {
+//			float diffLi = (LiRRTmp[0] - Li[0])+(LiRRTmp[1] - Li[1])+(LiRRTmp[2] - Li[2]); //T!
+//			if (diffLi > 1e-6) { //T!
+//				cout << "RR" << endl; //T!
+//				cout << "LiRRTmp = " << LiRRTmp.toString() << endl; //T!
+//				cout << "Li = " << Li.toString() << endl; //T!
+//			} //T!
+//		}
 		avgPathLength.incrementBase();
 		avgPathLength += rRec.depth;
 		return Li;

@@ -175,6 +175,7 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 
 	for (size_t i = 0; i<points.size(); ++i) {
 		Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
+//		cout << "offset[0] = " << offset[0] << " offset[1] = " << offset[1] << endl;
 		if (stop)
 			break;
 
@@ -211,13 +212,13 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 //				DEBUG_TAMAR = false;
 //			}
 
-
 			if ((print_out) and (DEBUG_TAMAR)){
 				cout << endl;
 				cout << "sample " << j << endl;
 			}
 
-			spec *= Li(sensorRay, rRec, Smk, print_out);
+			Spectrum photonSpec = Li(sensorRay, rRec, Smk, print_out);
+			spec *= photonSpec;
 
 			if ((print_out) and (DEBUG_TAMAR)) {
 				cout << "Smk: " << endl;
@@ -229,7 +230,7 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 				cout << "densityDerivative: " << endl;
 			}
 			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-				densityDerivative[i] += Smk[i] * spec; //TBD - put in the desired pixel
+				densityDerivative[i] += Smk[i] * photonSpec; //T! - change back to spec //TBD - put in the desired pixel
 				if ((print_out) and (DEBUG_TAMAR)) {
 					cout << densityDerivative[i].toString() << endl;
 				}
@@ -246,20 +247,31 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			}
 			sampler->advance();
 		}
-	}
-//	Spectrum tmp = Spectrum(sampler->getSampleCount());
-	for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-		densityDerivative[i] = densityDerivative[i] / Spectrum(sampler->getSampleCount());
-	}
-
-	bool output_to_file = 1;       //redirect densityDerivative to file
-	if (output_to_file) {
-		std::ofstream myfile;      //redirect densityDerivative to file
-		myfile.open("output.txt"); //redirect densityDerivative to file
+		//	Spectrum tmp = Spectrum(sampler->getSampleCount());
 		for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-			myfile << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl; //redirect densityDerivative to file
+			densityDerivative[i] = densityDerivative[i] / Spectrum(sampler->getSampleCount());
 		}
-		myfile.close(); //redirect densityDerivative to file
+
+		bool output_to_file = 1;       //redirect densityDerivative to file
+		if (output_to_file) {
+			std::ofstream myfile;      //redirect densityDerivative to file
+			if (offset[0] == 0) {
+				if (offset[1] == 0)
+					myfile.open("output_1.txt"); //redirect densityDerivative to file
+				else
+					myfile.open("output_2.txt"); //redirect densityDerivative to file
+			} else {
+				if (offset[1] == 0)
+					myfile.open("output_3.txt"); //redirect densityDerivative to file
+				else
+					myfile.open("output_4.txt"); //redirect densityDerivative to file
+			}
+
+			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
+				myfile << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl; //redirect densityDerivative to file
+			}
+			myfile.close(); //redirect densityDerivative to file
+		}
 	}
 }
 

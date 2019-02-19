@@ -363,6 +363,15 @@ public:
 		const Float fx = p.x - x1, fy = p.y - y1, fz = p.z - z1,
 				_fx = 1.0f - fx, _fy = 1.0f - fy, _fz = 1.0f - fz;
 
+//		cout << endl;
+//		cout << "point _p = (" << _p.x << ", " << _p.y << ", " << _p.z << ")" << endl;
+//		cout << "point p = (" << p.x << ", " << p.y << ", " << p.z << ")" << endl;
+//		cout << "(x1, y1, z1) = (" << x1 << ", " << y1 << ", " << z1 << ")" << endl;
+//		cout << "(x2, y2, z2) = (" << x2 << ", " << y2 << ", " << z2 << ")" << endl;
+//		cout << "(fx, fy, fz) = (" << fx << ", " << fy << ", " << fz << ")" << endl;
+//		cout << "(_fx, _fy, _fz) = (" << _fx << ", " << _fy << ", " << _fz << ")" << endl;
+
+
 		switch (m_volumeType) {
 			case EFloat32: {
 				const float *floatData = (float *) m_data;
@@ -377,7 +386,19 @@ public:
 					d110 = floatData[(z2*m_res.y + y2)*m_res.x + x1],
 					d111 = floatData[(z2*m_res.y + y2)*m_res.x + x2];
 
-					// floatGradData[(z1*m_res.y + y1)*m_res.x + x1] = -_fx * _fy * _fz
+////				cout << "floatData = " << floatData << endl;
+//				cout << "d000[" << (z1*m_res.y + y1)*m_res.x + x1 << "] = " << d000 << endl;
+//				cout << "d001[" << (z1*m_res.y + y1)*m_res.x + x2 << "] = " << d001 << endl;
+//				cout << "d010[" << (z1*m_res.y + y2)*m_res.x + x1 << "] = " << d010 << endl;
+//				cout << "d011[" << (z1*m_res.y + y2)*m_res.x + x2 << "] = " << d011 << endl;
+//				cout << "d100[" << (z2*m_res.y + y1)*m_res.x + x1 << "] = " << d100 << endl;
+//				cout << "d101[" << (z2*m_res.y + y1)*m_res.x + x2 << "] = " << d101 << endl;
+//				cout << "d110[" << (z2*m_res.y + y2)*m_res.x + x1 << "] = " << d110 << endl;
+//				cout << "d111[" << (z2*m_res.y + y2)*m_res.x + x2 << "] = " << d111 << endl;
+//				cout << endl;
+
+				// floatGradData[(z1*m_res.y + y1)*m_res.x + x1] = -_fx * _fy * _fz
+
 
 				return ((d000*_fx + d001*fx)*_fy +
 						(d010*_fx + d011*fx)*fy)*_fz +

@@ -120,7 +120,7 @@ class pySensor(object):
         self._type = sensor_type
         
     def set_fov(self, fov):
-        self._type = fov        
+        self._fov = fov        
     
     def set_film(self, ftype='mfilm', width=None, height=None, fileFormat=None):
         self._film.set_film(ftype, width, height, fileFormat)

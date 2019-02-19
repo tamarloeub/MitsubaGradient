@@ -1171,6 +1171,7 @@ private:
 	//Tamar
 	std::vector<Spectrum> m_densityDerivative;
 
+
 };
 
 MTS_NAMESPACE_END
