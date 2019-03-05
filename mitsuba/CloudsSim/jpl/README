@@ -1,0 +1,4 @@
+This is the extinction in units of [1/km]
+The grid point spacing in x and y is 0.02km 
+The grid point spacing in z is 0.04km
+Cloud bottom is at 0.44km

@@ -107,9 +107,8 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels):
 max_iterations = 500 * 2
 #step_size      = 5#.5
 n_unknowns     = 4
-n_cases        = 3
+n_cases        = 2
 beta_gt_factor = np.array([5])#, 4, 6])#, 5, 10]) #np.array([1, 2, 5, 10])
-#beta0_diff     = np.array([-0.5, -0.2, 0, 0.2, 0.5])
 #beta0_diff     = np.array([1, 2, 3])
 beta0_diff     = np.array([-0.5, -0.2, 0, 0.2, 0.5])
 grid_size = 8
@@ -134,7 +133,6 @@ for case in range(n_cases):
     I_algo        = np.zeros((n_sensors, len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations))
     runtime       = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations))
     cost_gradient = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, grid_size, 3))
-    real_step     = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, grid_size))
 
     ## 1 unknown
     #betas         = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, n_unknowns))
@@ -182,31 +180,26 @@ for case in range(n_cases):
 
     for nps in range(len(Np_vector)):
         for bb_gt in range(len(beta_gt_factor)):
-            #beta0_factor   = beta_gt_factor[bb_gt] + beta0_diff
-
             ## 4 unknowns
             #tmp = [round(x, 1) for x in np.random.uniform(0.51, beta_gt_factor[bb_gt] + 0.09, 4)]
             if   case == 0:
-                tmp = [1.1, 2.3, 2.4, 1.7] * 2 
-                additional_str = ' case 1'
+                tmp = [2.9, 2.1, 3.6, 2.6] * 2 
+                additional_str = ' case 1'                
             elif case == 1:
-                tmp = [1.6, 2.3, 1.0, 3.1] * 2
-                additional_str = ' case 2'
-            elif case == 2:
-                tmp = [3.5, 6.5, 1.6, 7.3] * 2                 
-                additional_str = ' case 3'
+                tmp = [5.2, 5.4, 3.4, 1.6] * 2
+                additional_str = ' case 2'                               
             else:
                 tmp = [1.2, 1.1, 0.9, 1.1] * 2#[1.5, 1.5, 1.2, 1.4]
-            tmp = np.array(tmp) #* 3
-            beta_4unknowns[0, bb_gt] = tmp[0:4]
-            beta_gt          =  np.reshape(tmp, [2, 2, 2], 'F')
-            #beta_gt          = np.zeros([2, 2, 2])
-            #beta_gt[:, :, 0] = np.reshape(tmp, [2, 2], 'F')
-            #beta_gt[:, :, 1] = np.reshape(tmp, [2, 2], 'F')
-            #beta_gt[0, :, :] = np.reshape(tmp, [2, 2])
-            #beta_gt[1, :, :] = np.reshape(tmp, [2, 2])
+
+            additional_str += ' cases that failed before'                    
+            tmp     = np.array(tmp) 
+            beta_gt = np.reshape(tmp, [2, 2, 2], 'F')
+            beta_4unknowns[0, bb_gt] = tmp[0:4]            
+            #beta_gt = np.reshape(tmp, [2, 2, 2])
+
             #camera
             #up_const     = np.array([-1, 0, 0])
+
             # radiancemeter
             up_const     = np.array([1, 0, 0])
             #target_const = np.array([0.01, 0.01, 0.01])
@@ -229,7 +222,6 @@ for case in range(n_cases):
 
             scene_gt[0].create_new_scene(beta=beta_gt, g=0, origin=sensors_pos[0]['origin'], target=sensors_pos[0]['target'], 
                                          up=sensors_pos[0]['up'], nSamples=Np_vector[nps]*4)
-            #sensors_pos[0] = scene_gt[0]._sensor.get_world_points()
 
             # Render Ground Truth Scene
             I_gt[0, nps, bb_gt], _ = render_scene(scene_gt[0]._scene, output_filename, n_cores, grid_size, n_pixels)
@@ -314,9 +306,8 @@ for case in range(n_cases):
                         algo_scene[ss]    = pyScene()
                         algo_scene[ss].create_new_scene(beta=beta, g=0, origin=sensors_pos[ss]['origin'], 
                                                         target=sensors_pos[ss]['target'], up=sensors_pos[ss]['up'], nSamples=Np_vector[nps])
-                        [ I_algo[ss, nps, bb_gt, bb, iteration], _ ] = render_scene(algo_scene[ss]._scene, output_filename, 
-                                                                                    n_cores, grid_size, n_pixels)
-                        [ _, inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size, n_pixels)
+                        [ I_algo[ss, nps, bb_gt, bb, iteration], 
+                          inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size, n_pixels)
 
                         ### beta is not a Spectrum, for now:
                         ## 1 unknown
@@ -336,16 +327,15 @@ for case in range(n_cases):
                         inner_grad_float[7] = inner_grad_float[3]
 
                         tmp        =  (-1) * ( I_algo[ss, nps, bb_gt, bb, iteration] - I_gt[ss, nps, bb_gt] )                    
-                        #cost_grad += inner_grad_float * tmp
                         cost_grad += np.matmul(inner_grad_float, tmp.flatten('F'))[:, None]
+                        #cost_grad += inner_grad_float * tmp
 
                     cost_gradient[nps, bb_gt, bb, iteration] = cost_grad
                     ## 1 unknown
                     #cost_grad_mat = np.ones(beta.shape) * cost_grad
                     ## 4 unknowns
-                    #cost_grad_mat = np.reshape(cost_grad, beta.shape, 'C')				
                     cost_grad_mat = np.reshape(cost_grad, beta.shape, 'F') #CHECK - I thins it's column stack but it's not C style 'F' ot 'C'
-
+                    #cost_grad_mat = np.reshape(cost_grad, beta.shape, 'C')    
 
                     ## ADAM implementation
                     first_moment  = beta1 * first_moment  + (1 - beta1) * cost_grad_mat
@@ -354,8 +344,7 @@ for case in range(n_cases):
                     first_moment_bar  = first_moment  / ( 1 - beta1**(iteration + 1) )
                     second_moment_bar = second_moment / ( 1 - beta2**(iteration + 1) )
 
-                    beta     -= alpha * first_moment_bar / (np.sqrt(second_moment_bar) + epsilon)    
-                    real_step[nps, bb_gt, bb, iteration] = -(alpha * first_moment_bar / cost_grad_mat).flatten('F')
+                    beta -= alpha * first_moment_bar / (np.sqrt(second_moment_bar) + epsilon)    
 
                     ## for fixed step size
                     #beta     += step_size * cost_grad_mat
@@ -429,31 +418,30 @@ for case in range(n_cases):
     iters = np.linspace(1, max_iterations, max_iterations)    
 
     for bb_gt in range(len(beta_gt_factor)):       
-        for bb in range(len(beta0_diff)):                   
+        for bb in range(len(beta0_diff)):    
+            bb0 = beta0_diff[bb]                   
+            diff = 0
+            for ss in range(n_sensors):
+                diff += np.squeeze( I_gt[ss, 0, bb_gt] * np.ones(I_algo[ss, 0, bb_gt, bb].shape)
+                                    - I_algo[ss, 0, bb_gt, bb] )
+            tmp       = np.mean(cost_gradient[0, bb_gt, bb], 2)   
+
             for un in range(4):
-                bb0 = beta0_diff[bb]                   
-                diff = 0
-                for ss in range(n_sensors):
-                    diff += np.squeeze( I_gt[ss, 0, bb_gt] * np.ones(I_algo[ss, 0, bb_gt, bb].shape)
-                                        - I_algo[ss, 0, bb_gt, bb] )
-                cost      = 0.5 * diff**2
-                tmp       = np.mean(cost_gradient[0, bb_gt, bb], 2)
+                #cost      = 0.5 * diff**2
                 gradient  = ( tmp[:, un] + tmp[:, un + 4] ) / 2
-                g_step    = ( real_step[nps, bb_gt, bb, :, un] + real_step[nps, bb_gt, bb, :, un + 4] ) / 2
                 betas_un  = ( betas[0, bb_gt, bb, :, un] + betas[0, bb_gt, bb, :, un + 4] ) / 2
                 betas_err = (betas_un - beta_4unknowns[0, bb_gt, un]) / beta_4unknowns[0, bb_gt, un] * 100
 
                 plt.figure(figsize=(19,9))    
 
-                plt.subplot(2, 2, 1)
-                plt.plot(iters, cost, '--',  marker='o', markersize=5)
-                plt.title('Cost', fontweight='bold')  
-                #plt.plot(iters, g_step, '--',  marker='o', markersize=5)     
-                #plt.title('Step Size', fontweight='bold')
-                plt.grid(True)
-                plt.xlim(left=0)
+                #plt.subplot(2, 2, 1)
+                #plt.plot(iters, cost, '--',  marker='o', markersize=5)
+                #plt.title('Cost', fontweight='bold')  
+                #plt.grid(True)
+                #plt.xlim(left=0)
 
-                plt.subplot(2, 2, 3)
+                #plt.subplot(2, 2, 3)
+                plt.subplot(2, 2, 4)
                 plt.plot(iters, gradient, '--',  marker='o', markersize=5)
                 #w = np.ones(10) / 10
                 #mean_grad = np.convolve(gradient.flatten(), w, 'same')
@@ -463,13 +451,15 @@ for case in range(n_cases):
                 plt.grid(True)
                 plt.xlim(left=0)
 
+                #plt.subplot(2, 2, 2)
                 plt.subplot(2, 2, 2)
                 plt.plot(iters, betas_un, '--',  marker='o', markersize=5)
                 plt.title('Beta', fontweight='bold')
                 plt.grid(True)
                 plt.xlim(left=0)
 
-                plt.subplot(2, 2, 4)
+                #plt.subplot(2, 2, 4)
+                plt.subplot(1, 2, 1)
                 plt.plot(iters, betas_err, '--',  marker='o', markersize=5)
                 plt.title('Beta error', fontweight='bold')
                 plt.xlabel('iteration')
@@ -477,11 +467,11 @@ for case in range(n_cases):
                 plt.grid(True)
                 plt.xlim(left=0)    
 
-                plt.suptitle('Independent. Original beta = ' + str(beta_4unknowns[0, bb_gt, un]) + ', starting with beta0 = ' + str(bb0) + ', Np = ' + str(Np_vector[0]) + ', unknown ' + str(un + 1), fontweight='bold')
+                plt.suptitle('Original beta = ' + str(beta_4unknowns[0, bb_gt, un]) + ', starting with beta0 = ' + str(bb0) + ', Np = ' + str(Np_vector[0]) + ', unknown ' + str(un + 1), fontweight='bold')
                 #plt.show()
 
                 #out_name = '_fix grad 4 unknowns' + sensors_s + ' dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam beta gt ' + str(beta_gt_factor[bb_gt]) + ' beta0 ' + str(bb0) + alpha_s + beta1_s + beta2_s + additional_str + '_' + str(un + 1) +'photonSpec_F.png'
-                out_name = '_fix grad 4 unknowns' + sensors_s + ' independent grad and fwd Np '+ str(Np_vector[0]) + ' adam' + additional_str + ' beta0 ' + str(bb0) + alpha_s + beta1_s + beta2_s + '_' + str(un + 1) +' photonSpec_F.png'
+                out_name = '_fix grad 4 unknowns' + sensors_s + ' dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam' + additional_str + ' beta0 ' + str(bb0) + alpha_s + beta1_s + beta2_s + '_' + str(un + 1) +' photonSpec_F.png'
                 plt.savefig(out_path + out_name, dpi=300)
 
     ### several Nps

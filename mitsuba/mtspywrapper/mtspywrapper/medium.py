@@ -9,17 +9,18 @@ import datetime
 
 class pyMedium(object):
     def __init__(self):
-        self._pmgr = PluginManager.getInstance()
+        self._pmgr    = PluginManager.getInstance()
         self._density = None
-        self._albedo = 1
-        self._phase = None
-        self._scale = 1
+        self._albedo  = 1
+        self._phase   = None
+        self._scale   = 1
         self._bounding_box = None
-        self._shape = ()
-        self._medium_path = 'Myscenes/' + datetime.datetime.now().strftime("%y_%m_%d_%H:%M")
-        self._files = dict()
-        self._boundaries = {'x' : 'open', 'y' : 'open' }
-        
+        self._shape        = ()
+        self._medium_path  = 'Myscenes/' + datetime.datetime.now().strftime("%y_%m_%d_%H:%M")
+        self._files        = dict()
+        self._boundaries   = {'x' : 'open', 'y' : 'open' }    
+        self._id           = "OneVoxel"
+    
     def create_boundingbox(self, bounds):
         #input :  bounds = [xmin, ymin, zmin, xmax, ymax, zmax]
         self._bounding_box = bounds
@@ -178,8 +179,11 @@ class pyMedium(object):
                    
         self.create_boundingbox(bounds)
         self._scale = float(density_mat.max())
-                                    
-        density_norm = density_mat / self._scale
+        
+        if float(self._scale) == 0.0:                                
+            density_norm = density_mat
+        else:
+            density_norm = density_mat / self._scale
         
         if density_mat.shape == ():
             self._density = float(data)
@@ -227,6 +231,8 @@ class pyMedium(object):
     
     def density_to_mitsuba(self):
         volume = self.get_density_data()
+        if float(self._scale) is not 0.0:
+            volume /= self._scale
         if np.array(volume).shape == ():
             density_str = {
                 'type' : 'constvolume',
@@ -356,7 +362,6 @@ class pyMedium(object):
         return dictionary
 
     def bounding_to_dict(self):
-        _id        = 'OneVoxel'
         dictionary = {
             'type'   : 'obj',
             'string' : {
@@ -365,16 +370,15 @@ class pyMedium(object):
             },
             'ref':{
                 'name' : 'interior',
-                'id'   : _id
+                'id'   : self._id
             }
         }
         return dictionary
     
     def to_dict(self):
-        _id        = 'OneVoxel'
         dictionary = {
             'type'  : 'heterogeneous',
-            'id'    : _id,
+            'id'    : self._id,
             'string': {
                 'name'  : 'method',
                 'value' : 'woodcock'

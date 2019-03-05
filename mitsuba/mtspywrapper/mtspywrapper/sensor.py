@@ -5,10 +5,9 @@ from mitsuba.render import Sensor
 
 class pySampler(object):
     def __init__(self):
-        self._type = 'ldsampler'
+        self._type        = 'ldsampler'
         self._sampleCount = 4096
-        self._pmgr = PluginManager.getInstance()
-        
+        self._pmgr        = PluginManager.getInstance()
         
     def set_sampler(self, stype='ldsampler', sampleCount=4096):
         self._type        = stype
@@ -43,19 +42,15 @@ class pyFilm(object):
         self._pmgr       = PluginManager.getInstance()        
         self._width      = None
         self._height     = None       
-        self._fileFormat = None
         
-    def set_film(self, ftype='mfilm', width=None, height=None, fileFormat=None):
+    def set_film(self, ftype='mfilm', width=None, height=None):
         self._type = ftype
         if width is not None:
             if height is not None:
                 self._width  = width
                 self._height = height
         else:
-            assert ( (width is None) and (height is None) ), "width and height need to be set together (one of them is None)"    
-            
-        if fileFormat is not None:
-            self._fileFormat = fileFormat
+            assert ( (width is None) and (height is None) ), "width and height need to be set together (one of them is None)"
         
     def get_type(self):
         return self._type
@@ -68,19 +63,11 @@ class pyFilm(object):
     
     def film_to_mitsuba(self):
         if self._width is not None:
-            if self._fileFormat is not None:
-                film_str = self._pmgr.create({
-                    'type' : self.get_type(),
-                    'fileFormat' : self._fileFormat,               
-                    'width' : self._width,
-                    'height' : self._height
-                })
-            else:
-                film_str = self._pmgr.create({
-                    'type' : self.get_type(),
-                    'width' : self._width,
-                    'height' : self._height
-                })
+            film_str = self._pmgr.create({
+                'type' : self.get_type(),
+                'width' : self._width,
+                'height' : self._height
+            })
         else:
             film_str = self._pmgr.create({
                 'type'        : self.get_type()
@@ -89,16 +76,17 @@ class pyFilm(object):
 
     def to_dict(self):
         if self._width is not None:
-            if self._fileFormat is not None:
-                dictionary = {
-                    'type' : self.get_type()
+            dictionary = {
+                'type'         : self.get_type(),
+                ('integer', 0) : {
+                    'name'  : 'width',
+                    'value' : self._width                
+                },
+                ('integer', 1) : {
+                    'name'  : 'height',
+                    'value' : self._height            
                 }
-            else:
-                dictionary = {
-                    'type'   : self.get_type(),
-                    'width'  : self._width,
-                    'height' : self._height
-                }
+            }
         else:
             dictionary = {
                 'type'        : self.get_type()
@@ -113,8 +101,10 @@ class pySensor(object):
         self._fov     = None
         self._film    = pyFilm()
         self._sampler = pySampler()
-        self._toWorld_dict = dict()
+        self._toWorld_dict      = dict()
         self._toWorld_transform = None
+        self._medium = None
+        self._id     = "OneVoxel"        
     
     def set_type(self, sensor_type):
         self._type = sensor_type
@@ -122,8 +112,8 @@ class pySensor(object):
     def set_fov(self, fov):
         self._fov = fov        
     
-    def set_film(self, ftype='mfilm', width=None, height=None, fileFormat=None):
-        self._film.set_film(ftype, width, height, fileFormat)
+    def set_film(self, ftype='mfilm', width=None, height=None):
+        self._film.set_film(ftype, width, height)
     
     def set_to_world(self, points):
         self._toWorld_dict = {
@@ -139,6 +129,9 @@ class pySensor(object):
     def set_sampler(self, num_samples, sampler_type='ldsampler'):
         self._sampler.set_sampler(sampler_type, num_samples)
 
+    def set_medium(self, medium):
+        self._medium = medium
+        
     def get_film(self):
         return self._film
     
@@ -166,6 +159,7 @@ class pySensor(object):
                 'fov'     : self.get_fov(),
                 'toWorld' : self.get_world_transform(),
                 'film'    : film.film_to_mitsuba(),
+                'ref'     : self._medium.medium_to_mitsuba(),
                 'sampler' : sampler.sample_to_mitsuba()
             })
         else:
@@ -173,6 +167,7 @@ class pySensor(object):
                 'type'    : self.get_type(),
                 'toWorld' : self.get_world_transform(),
                 'film'    : film.film_to_mitsuba(),
+                'ref'     : self._medium.medium_to_mitsuba(),                
                 'sampler' : sampler.sample_to_mitsuba()
             })
         return sensor_str
@@ -182,7 +177,13 @@ class pySensor(object):
         if self.get_fov() is not None:
             dictionary = {
                 'type'      : self.get_type(),
-                'fov'       : self.get_fov(),
+                'ref'       : {
+                    'id' : self._id
+                },                
+                'float'     : {
+                    'name'  : 'fov',
+                    'value' : self.get_fov()
+                },
                 'transform' : {
                     'name'   : 'toWorld',
                     'lookat' : {
@@ -196,7 +197,10 @@ class pySensor(object):
             }              
         else :
             dictionary = {
-                'type'      : self.get_type(),
+                'type' : self.get_type(),
+                'ref'       : {
+                    'id' : self._id
+                }, 
                 'transform' : {
                     'name'   : 'toWorld',
                     'lookat' : {

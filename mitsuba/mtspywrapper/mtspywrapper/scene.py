@@ -31,27 +31,33 @@ class pyScene(object):
         max_medium    = np.array([bounds[3], bounds[4], bounds[5]])
         min_medium    = np.array([bounds[0], bounds[1], bounds[2]])
         medium_center = ( max_medium + min_medium ) / 2
-        center_TOA    = medium_center + np.array([0, 0, max_medium[2]])
+        #center_TOA    = medium_center
+        #center_TOA[2] = max_medium[2]
+        focal_point   = np.array([points['target'][0], points['target'][1], points['target'][2]])
         sensor_origin = np.array([points['origin'][0], points['origin'][1], points['origin'][2]])
         
-        L       = max_medium[0] - medium_center[0]
-        H       = np.linalg.norm(sensor_origin - center_TOA)
+        #L       = (max_medium[0] - min_medium[0]) / 2 #camera's FOV covers the whole medium
+        #H       = np.linalg.norm(sensor_origin - center_TOA)
+        L       = np.max([max_medium[0] - min_medium[0], max_medium[1] - min_medium[1]]) / 2 #camera's FOV covers the whole medium
+        H       = np.linalg.norm(sensor_origin - focal_point) 
         fov_rad = 2 * np.arctan(L / H)
         fov_deg = 180 * fov_rad / np.pi
         return fov_deg
     
-    def set_sensor_film_sampler(self, sensorType, points, nSamples, fov=None, width=None, height=None):        
+    def set_sensor_film_sampler(self, sensorType, points, nSamples, fov_f=False, fov=None, width=None, height=None):        
         # Create a sensor, film & sample generator
         self._sensor = pySensor()
         if sensorType is None:
             sensorType = 'radiancemeter'
         self._sensor.set_type(sensorType)
         self._sensor.set_sampler(nSamples)
-        self._sensor.set_to_world(points)        
+        self._sensor.set_to_world(points) 
+        self._sensor.set_medium(self._medium)
         if sensorType is 'perspective':
-            if fov is None:
+            if (fov is None) and (fov_f is True):
+                #esle use Mitsuba's default FOV
                 fov = self.calculate_fov(points)
-            self._sensor.set_fov(fov)
+                self._sensor.set_fov(fov)
             self._sensor.set_film(width=width, height=height)
                
     def set_integrator(self):
@@ -82,6 +88,7 @@ class pyScene(object):
         # Define the extinction field (\beta) in [km^-1]
         if bounding_box is None:
             bounding_box = [-1, -1, -1, 1, 1, 1]   # [xmin, ymin, zmin, xmax, ymax, zmax] in km units 
+            #bounding_box = [-250, -250, 0, 250, 250, 400]
         
         beta_parameter = 0.9
         if isinstance(beta, int):
@@ -99,7 +106,7 @@ class pyScene(object):
     
         self._medium.set_density(beta, bounding_box)   
         
-    def set_scene(self, beta=(), albedo=None, sensorType=None, points=None, nSamples=4096, fov=None, width=None, height=None, bounding_box=None, g=None):
+    def set_scene(self, beta=(), albedo=None, sensorType=None, points=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, bounding_box=None, g=None):
         if points is None:
             points = dict()
             points['origin'] = Point(0, 0, 3)
@@ -114,7 +121,7 @@ class pyScene(object):
             points['up']     = Vector(1, 0, 0)           
             
         self.set_medium(beta, albedo, bounding_box, g)
-        self.set_sensor_film_sampler(sensorType, points, nSamples, fov, width, height)        
+        self.set_sensor_film_sampler(sensorType, points, nSamples, fov_f, fov, width, height)        
         self.set_integrator()
         self.set_emitter()
         self._scene_set = True
@@ -139,7 +146,7 @@ class pyScene(object):
         
         return self._scene
     
-    def create_new_scene(self, beta=(), albedo=None, sensorType=None, origin=None, target=None, up=None, nSamples=4096, fov=None, width=None, height=None, scene_type='smallMedium', bounding_box=None, g=None):
+    def create_new_scene(self, beta=(), albedo=None, sensorType=None, origin=None, target=None, up=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, scene_type='smallMedium', bounding_box=None, g=None):
         if (origin is not None) and (target is not None) and (up is not None):
             points           = dict()
             points['origin'] = origin
@@ -147,8 +154,10 @@ class pyScene(object):
             points['up']     = up     
         else:
             points = None
-        self.set_scene(beta, albedo, sensorType, points, nSamples, fov, width, height, bounding_box, g)
-        return self.configure_scene(scene_type)
+        self.set_scene(beta, albedo, sensorType, points, nSamples, fov_f, fov, width, height, bounding_box, g)
+        self.configure_scene(scene_type)
+        self.scene_to_xml()
+        return
         
     def copy_scene(self):
         new_scene         = pyScene()

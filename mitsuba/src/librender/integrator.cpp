@@ -175,7 +175,6 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 
 	for (size_t i = 0; i<points.size(); ++i) {
 		Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
-//		cout << "offset[0] = " << offset[0] << " offset[1] = " << offset[1] << endl;
 		if (stop)
 			break;
 
@@ -236,7 +235,6 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 				}
 			}
 
-
 			block->put(samplePos, spec, rRec.alpha);
 
 			if ((print_out) and (DEBUG_TAMAR)) {
@@ -254,18 +252,22 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 
 		bool output_to_file = 1;       //redirect densityDerivative to file
 		if (output_to_file) {
+			std::stringstream filename;
+			filename << "output_" << offset[0] << "_" << offset[1] << ".txt";
 			std::ofstream myfile;      //redirect densityDerivative to file
-			if (offset[0] == 0) {
-				if (offset[1] == 0)
-					myfile.open("output_1.txt"); //redirect densityDerivative to file
-				else
-					myfile.open("output_2.txt"); //redirect densityDerivative to file
-			} else {
-				if (offset[1] == 0)
-					myfile.open("output_3.txt"); //redirect densityDerivative to file
-				else
-					myfile.open("output_4.txt"); //redirect densityDerivative to file
-			}
+			myfile.open(filename.str().c_str());
+//			cout << filename.str() << endl;
+//			if (offset[0] == 0) {
+//				if (offset[1] == 0)
+//					myfile.open("output_1.txt"); //redirect densityDerivative to file
+//				else
+//					myfile.open("output_2.txt"); //redirect densityDerivative to file
+//			} else {
+//				if (offset[1] == 0)
+//					myfile.open("output_3.txt"); //redirect densityDerivative to file
+//				else
+//					myfile.open("output_4.txt"); //redirect densityDerivative to file
+//			}
 
 			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
 				myfile << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl; //redirect densityDerivative to file

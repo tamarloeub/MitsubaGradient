@@ -242,7 +242,12 @@ public:
 						&& (!m_hideEmitters || scattered)) {
 						Spectrum value = throughput * scene->evalEnvironment(ray);
 						if (rRec.medium) {
+//							Spectrum val_diff = rRec.medium->evalTransmittance(ray);
+//							value *= val_diff;
 							value *= rRec.medium->evalTransmittance(ray);
+//							if ((val_diff[0] != 1.0) or (val_diff[1] != 1.0) or (val_diff[2] != 1.0)) {
+//								cout << "rRec.medium " << " 0 = " << val_diff[0] << " 1 = " << val_diff[1] << " 2 = " << val_diff[2] << endl;
+//							}
 							if (DEBUG_TAMAR) {
 								cout << "throughput: " << throughput.toString() << endl;
 								cout << "mRec: [" << endl;
@@ -251,6 +256,10 @@ public:
 								cout << "value: " << value.toString() << endl;
 								cout << endl;
 							}
+						}
+						if (!value.isZero()){
+							cout << "else, its.is valid == 0 and rRec type is RadianceQueryRecord::EEmittedRadiance = " << rRec.type << " scattered is " << scattered << " m_hideEmitters is " << m_hideEmitters << endl;
+							cout << "valie is " << value.toString() << endl;
 						}
 						Li += value;
 //						float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
@@ -273,6 +282,7 @@ public:
 				/* Possibly include emitted radiance if requested */
 				if (its.isEmitter() && (rRec.type & RadianceQueryRecord::EEmittedRadiance)
 					&& (!m_hideEmitters || scattered)){
+					cout << "else, its.isEmitter() is " << its.isEmitter() << " and rRec.type is RadianceQueryRecord::EEmittedRadiance = " << rRec.type << endl;
 					Li += throughput * its.Le(-ray.d);
 //					float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
 //					if (diffLi > 1e-6) { //T!
@@ -284,6 +294,7 @@ public:
 
 				/* Include radiance from a subsurface integrator if requested */
 				if (its.hasSubsurface() && (rRec.type & RadianceQueryRecord::ESubsurfaceRadiance)){
+					cout << "else, its.isEmitter() is " << its.hasSubsurface() << " and rRec.type is RadianceQueryRecord::ESubsurfaceRadiance = " << rRec.type << endl;
 					Li += throughput * its.LoSub(scene, rRec.sampler, -ray.d, rRec.depth);
 //					float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
 //					if (diffLi > 1e-6) { //T!
@@ -330,6 +341,7 @@ public:
 						/* Prevent light leaks due to the use of shading normals */
 						if (!m_strictNormals ||
 							woDotGeoN * Frame::cosTheta(bRec.wo) > 0) {
+							cout << "else, BSDF m_strictNormals is zero = " << m_strictNormals << " and woDotGeoN * Frame::cosTheta(bRec.wo) > 0" << endl;
 							Li += throughput * value * bsdf->eval(bRec);
 //							float diffLi = (LiTmp[0] - Li[0])+(LiTmp[1] - Li[1])+(LiTmp[2] - Li[2]); //T!
 //							if (diffLi > 1e-6) { //T!
@@ -352,7 +364,9 @@ public:
 //					cout << "bsdfVal = 0" << endl;
 					break;
 				}
-
+				if ((bsdfVal[0] != 1.0) && (bsdfVal[1] != 1.0) && (bsdfVal[2] != 1.0)){
+					cout << "bsdfVal = " << bsdfVal.toString() << endl;
+				}
 				/* Recursively gather indirect illumination? */
 				int recursiveType = 0;
 				if ((rRec.depth + 1 < m_maxDepth || m_maxDepth < 0) &&
