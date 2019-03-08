@@ -424,11 +424,14 @@ public:
 			mRec.scoreIndxs.insert(mRec.scoreIndxs.end(), inIndxs.begin(), inIndxs.end());
 
 			Float densityAtT = lookupDensity(p, ray.d) * m_scale;
+			Float density_eps = 1 / 1000;
 			Float factor;
+			Float density_factor;
 			if ( (i == nSteps) && (isDirectRay == false) && (densityAtT > 0) ) {
 				// calculating :  inDev *= (1 / betaAtT -stepSize )
 //				std::transform( inDev.begin(), inDev.end(), inDev.begin(), std::bind1st(std::multiplies<float>(), ( 1 / densityAtT - stepSize )) );
-				factor = ( 1 / densityAtT - stepSize );
+				density_factor = sqrt( pow(densityAtT, 2.0) + pow(density_eps, 2) );
+				factor = ( 1 / density_factor - stepSize );
 
 			} else {
 				// calculating :  inDev *= ( -stepSize );

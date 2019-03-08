@@ -236,7 +236,7 @@ def get_grad_from_output_file(filename):
     f.close()
     return grad
 
-def render_scene(scene, output_filename, n_cores, grid_size, n_pixels):    
+def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h):    
     queue = RenderQueue()
 
     # Create a queue for tracking render jobs
@@ -265,9 +265,10 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels):
     #outFile.close()
 
     radiance   = np.array(bitmap.buffer()) 
-    inner_grad = np.zeros([grid_size, 3, n_pixels])
-    for i in range(n_pixels):
-        inner_grad[:, :, i] = get_grad_from_output_file('output_' + str(i+1) + '.txt')
+    inner_grad = np.zeros([grid_size, 3, n_pixels_w, n_pixels_h])
+    for pw in range(n_pixels_w):
+        for ph in range(n_pixels_h):
+            inner_grad[:, :, pw, ph] = get_grad_from_output_file('output_' + str(pw) + '_' + str(ph)+ '.txt')
 
     # End session
     queue.join() 
@@ -360,6 +361,8 @@ for case in range(n_cases):
             ## 4 unknowns
             #tmp = [round(x, 1) for x in np.random.uniform(0.51, beta_gt_factor[bb_gt] + 0.09, 4)]
             if   case == 0:
+                #tmp = [47.15647 , 42.04811 , 46.568592, 46.9949  , 67.82982 , 56.80726 ,
+       #61.957237, 51.443108]
                 tmp = [1.1, 2.3, 2.4, 1.7] * 2 
                 additional_str = ' case 1'                
             elif case == 1:
@@ -386,34 +389,41 @@ for case in range(n_cases):
             #beta_gt        = scene_gt[0].get_scene_beta()
             
             ## 4 unknowns
+            #bounds = [-0.02, -0.02, 0, 0.02, 0.02, 0.08]
             t1  = np.array([0, 0, 1.01])#0.01])
+            #t1  = np.array([0, 0, bounds[5]])#1.01])#0.01])
             co1 = np.array([0, 0, 3]) 
+            #co1 = np.array([0, 0, bounds[5] + 0.1]) #3]) 
             newUp1, _ = transformLookAt(co1, t1, up_const)
 
             sensors_pos[0] = { 'origin' : Point(co1[0], co1[1], co1[2]),
                                'target' : Point(t1[0], t1[1], t1[2]), 
                                'up'     : Vector(newUp1[0], newUp1[1], newUp1[2]) }
 
-            scene_gt[0].create_new_scene(beta=beta_gt, g=0, origin=sensors_pos[0]['origin'], target=sensors_pos[0]['target'], 
+            scene_gt[0].create_new_scene(beta=beta_gt, g=0.85, origin=sensors_pos[0]['origin'], target=sensors_pos[0]['target'], 
                                          up=sensors_pos[0]['up'], nSamples=Np_vector[nps] * 4, sensorType='perspective', fov_f=True, 
+                                         #bounding_box = bounds,
                                          width=n_pixels_w, height=n_pixels_h)
 
             # Render Ground Truth Scene
-            I_gt[0, nps, bb_gt], _ = render_scene(scene_gt[0]._scene, output_filename, n_cores, grid_size, n_pixels)
+            I_gt[0, nps, bb_gt], _ = render_scene(scene_gt[0]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
 
             ## Add more sensors
             #sensors_pos[1] = { 'origin' : Point(0, 0, -3),  ## NOT A GOOD POSITION!!!
                                 #'target' : sensors_pos[0]['target'], 
                                 #'up'     : Vector(-1, 0, 0) }
             t2  = t1 #np.array([0.5, -0.5, 1.01])
-            co2 = np.array([0, 2, 3])             
+            co2 = np.array([0, 2, 3])     
+            #co2 = np.array([0, 0.03, bounds[5]+0.1])#2, 3])                         
             newUp2, _ = transformLookAt(co2, t2, up_const)     
             sensors_pos[1] = { 'origin' : Point(co2[0], co2[1], co2[2]), 
                                'target' : Point(t2[0], t2[1], t2[2]),
                                'up'     : Vector(newUp2[0], newUp2[1], newUp2[2]) }
 
             t3  = t1 #np.array([-0.5, 0.5, 1.01])
-            co3 = np.array([2, 0, 3])                        
+            co3 = np.array([2, 0, 3]) 
+            #co3 = np.array([0.03, 0, bounds[5]+0.1])#2, 0, 3])                        
+            
             newUp3, _ = transformLookAt(co3, t3, up_const)       
             sensors_pos[2] = { 'origin' : Point(co3[0], co3[1], co3[2]), 
                                'target' : Point(t3[0], t3[1], t3[2]), 
@@ -426,20 +436,22 @@ for case in range(n_cases):
                                #'up'     : Vector(newUp4[0], newUp4[1], newUp4[2]) }
 
             scene_gt[1]    = pyScene()
-            scene_gt[1].create_new_scene(beta=beta_gt, g=0, origin=sensors_pos[1]['origin'], target=sensors_pos[1]['target'], 
+            scene_gt[1].create_new_scene(beta=beta_gt, g=0.85, origin=sensors_pos[1]['origin'], target=sensors_pos[1]['target'], 
                                          up=sensors_pos[1]['up'], nSamples=Np_vector[nps] * 4, sensorType='perspective', fov_f=True,
+                                         #bounding_box = bounds,                                         
                                          width=n_pixels_w, height=n_pixels_h)
             scene_gt[2]    = pyScene()
-            scene_gt[2].create_new_scene(beta=beta_gt, g=0, origin=sensors_pos[2]['origin'], target=sensors_pos[2]['target'], 
+            scene_gt[2].create_new_scene(beta=beta_gt, g=0.85, origin=sensors_pos[2]['origin'], target=sensors_pos[2]['target'], 
                                          up=sensors_pos[2]['up'], nSamples=Np_vector[nps] * 4, sensorType='perspective', fov_f=True,
+                                         #bounding_box = bounds,                                         
                                          width=n_pixels_w, height=n_pixels_h)
             #scene_gt[3]    = pyScene()
             #scene_gt[3].create_new_scene(beta=beta_gt, g=0, origin=sensors_pos[3]['origin'], target=sensors_pos[3]['target'], 
                                          #up=sensors_pos[3]['up'], nSamples=Np_vector[nps] * 4, sensorType='perspective', 
                                          #width=n_pixels_w, height=n_pixels_h)
 
-            I_gt[1, nps, bb_gt], _ = render_scene(scene_gt[1]._scene, output_filename, n_cores, grid_size, n_pixels)
-            I_gt[2, nps, bb_gt], _ = render_scene(scene_gt[2]._scene, output_filename, n_cores, grid_size, n_pixels)
+            I_gt[1, nps, bb_gt], _ = render_scene(scene_gt[1]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
+            I_gt[2, nps, bb_gt], _ = render_scene(scene_gt[2]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
             #I_gt[3, nps, bb_gt], _ = render_scene(scene_gt[3]._scene, output_filename, n_cores, grid_size, n_pixels)
 
             print(beta_gt_factor[bb_gt])
@@ -470,7 +482,7 @@ for case in range(n_cases):
                     ## 1 unknown
                     #betas[nps, bb_gt, bb, iteration] = np.mean(np.mean(beta))
                     #cost_grad = np.zeros((n_unknowns, n_pixels))
-                                ## 4 unknowns
+                    ## 4 unknowns
                     betas[nps, bb_gt, bb, iteration] = beta.flatten('F')                
                     #betas[nps, bb_gt, bb, iteration] = beta.flatten() 
                     cost_grad = np.zeros((n_unknowns*2, 1))                     
@@ -478,12 +490,13 @@ for case in range(n_cases):
                     for ss in range(n_sensors):
                         # Create scene with given beta
                         algo_scene[ss]    = pyScene()
-                        algo_scene[ss].create_new_scene(beta=beta, g=0, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
+                        algo_scene[ss].create_new_scene(beta=beta, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
                                                         up=sensors_pos[ss]['up'], nSamples=Np_vector[nps], fov_f=True, sensorType='perspective',
+                                                        #bounding_box = bounds,
                                                         width=n_pixels_w, height=n_pixels_h)
                         
                         [ I_algo[ss, nps, bb_gt, bb, iteration], 
-                          inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size, n_pixels)
+                          inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
 
                         ### beta is not a Spectrum, for now:
                         ## 1 unknown
@@ -503,7 +516,7 @@ for case in range(n_cases):
                         inner_grad_float[7] = inner_grad_float[3]
 
                         tmp        =  (-1) * ( I_algo[ss, nps, bb_gt, bb, iteration] - I_gt[ss, nps, bb_gt] )                    
-                        cost_grad += np.matmul(inner_grad_float, tmp.flatten('F'))[:, None]
+                        cost_grad += np.sum(np.sum(inner_grad_float * tmp, 2), 1) [:, None]                       
                         #cost_grad += inner_grad_float * tmp
 
                     cost_gradient[nps, bb_gt, bb, iteration] = cost_grad
@@ -530,7 +543,8 @@ for case in range(n_cases):
                         ## 1 unknown
                         #beta = np.ones(beta.shape) * 0.1
                         ## 4 unknowns
-                        beta[beta <= 0] = 0.1
+                        beta_before = beta + alpha * first_moment_bar / (np.sqrt(second_moment_bar) + epsilon)    
+                        beta[beta <= 0] = beta_before[beta <= 0]
                         print('fixed beta!')
 
                     end = time.time()

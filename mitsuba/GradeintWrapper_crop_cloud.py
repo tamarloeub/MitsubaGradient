@@ -126,31 +126,40 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixel
 # load density from vol file
 
 ## Eshkol's cloud
-beta_gt = set_density_from_vol('/home/tamarl/MitsubaGradient/mitsuba/CloudsSim/50CNN_128x128x100_beta_cutted_vol.vol')
-bounds  = [-250, -250, 0, 250, 250, 800]   # bounding box = [xmin, ymin, zmin, xmax, ymax, zmax] in meters units 
-
-## load jpl's cloud
-#beta_gt   = np.load('CloudsSim/jpl/jpl_ext.npy')
-#x_spacing = 0.02 # in km
-#y_spacing = 0.02 # in km
-#z_spacing = 0.04 # in km
+#beta_gt = set_density_from_vol('/home/tamarl/MitsubaGradient/mitsuba/CloudsSim/eshkol/50CNN_128x128x100_beta_cutted_vol_2_2_2.vol')
+#x_spacing = 50 # in meters
+#y_spacing = 50 #/ in meters
+#z_spacing = 40 # in meters
 
 #[ nx, ny, nz ] = beta_gt.shape
-#bounds = [-nx * x_spacing / 2, -ny * y_spacing / 2, 0, nx * x_spacing / 2, ny * y_spacing / 2, nz * z_spacing]   # bounding box = [xmin, ymin, zmin, xmax, ymax, zmax] in km units 
+#bounds  = [-nx * x_spacing / 2, -ny * y_spacing / 2, 0, nx * x_spacing / 2, ny * y_spacing / 2, nz * z_spacing]#-250, -250, 0, 250, 250, 80]   # bounding box = [xmin, ymin, zmin, xmax, ymax, zmax] in meters units 
+
+#beta0_diff     = np.array([0.1])#, max_val, 0.1]) 
+
+## load jpl's cloud
+jpl_full_cloud = np.load('CloudsSim/jpl/jpl_ext.npy')
+beta_gt   = jpl_full_cloud[15:17,17:19, 13:15]
+x_spacing = 0.02 # in km
+y_spacing = 0.02 # in km
+z_spacing = 0.04 # in km
+
+[ nx, ny, nz ] = beta_gt.shape
+bounds = [-nx * x_spacing / 2, -ny * y_spacing / 2, 0, nx * x_spacing / 2, ny * y_spacing / 2, nz * z_spacing]   # bounding box = [xmin, ymin, zmin, xmax, ymax, zmax] in km units 
+
+beta0_diff     = np.array([2])#, max_val, 0.1]) 
 
 beta_gt_flat = beta_gt.flatten('F')
 
 # algorithm parameters
-max_iterations = 500
+max_iterations = 1500
 n_unknowns     = np.prod(beta_gt.shape)
 max_val        = np.max(beta_gt_flat)
-beta0_diff     = np.array([0, max_val]) 
 grid_size      = np.prod(beta_gt.shape)
 
 # sensors parameters
-n_sensors  = 9
-n_pixels_w = 10 #TBD
-n_pixels_h = 10 #TBD
+n_sensors  = 3
+n_pixels_w = 2 #TBD
+n_pixels_h = 2 #TBD
 n_pixels   = n_pixels_h * n_pixels_w
 
 # optimizer parameters - ADAM
@@ -159,14 +168,15 @@ beta1   = 0.9  # randomly select beta1 hyperparameter -> sample (1-beta1), r = -
 epsilon = 1e-8
 beta2   = 0.999
 
-Np_vector     = np.array([8192 / 2])
+Np_vector     = np.array([512]) * 128#np.array([8192 / 4])
 scene_gt      = [ None ] * n_sensors # create an empty list
 algo_scene    = [ None ] * n_sensors # create an empty list
 sensors_pos   = [ None ] * n_sensors # create an empty list
+gt_grad       = np.zeros((n_sensors, grid_size, 3, n_pixels_h, n_pixels_w))
 I_gt          = np.zeros((n_sensors, n_pixels_h, n_pixels_w))
 I_algo        = np.zeros((n_sensors, len(beta0_diff), max_iterations, n_pixels_h, n_pixels_w))
 runtime       = np.zeros((len(beta0_diff), max_iterations))
-cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size, n_pixels))
+cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))#, n_pixels_h, n_pixels_w))
 betas         = np.zeros((len(beta0_diff), max_iterations, grid_size))
 
 f_multi         = True
@@ -191,20 +201,13 @@ if n_sensors > 1:
 else:
     sensors_s = ''
 
-## Jpl
-#TOA      = bounds[5]
-#H        = 0#.08
-#t_const  = np.array([0, 0, TOA / 2])
-
-## Eshkol
-TOA      = bounds[5] / 2
-H        = 100
+TOA      = bounds[5]
+H        = z_spacing * 2
 t_const  = np.array([0, 0, TOA])
-
 up_const = np.array([-1, 0, 0])
 
 # Ground Truth:
-sensors_radius = 0.34
+sensors_radius = nx * x_spacing / 2
 o = np.zeros((n_sensors, 3))
 o[0] = np.array([0, 0, TOA + H]) 
 for ss in range(n_sensors - 1):
@@ -219,22 +222,23 @@ for ss in range(n_sensors):
     
     scene_gt[ss] = pyScene()
     scene_gt[ss].create_new_scene(beta=beta_gt, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
-                                  up=sensors_pos[ss]['up'], nSamples=256, sensorType='perspective', bounding_box=bounds, fov_f=True, 
+                                  up=sensors_pos[ss]['up'], nSamples=Np_vector[0]*4*4, sensorType='perspective', bounding_box=bounds, fov_f=True, 
                                   width=n_pixels_w, height=n_pixels_h)
 
-    #I_gt[ss], _ = render_scene(scene_gt[ss]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
+    I_gt[ss], gt_grad[ss] = render_scene(scene_gt[ss]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
 
-    scene        = sceneLoadFromFile(os.path.realpath(scene_gt[ss]._medium._medium_path) + '/scene.xml')
-    I_gt[ss], _ = render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
+    ##scene        = sceneLoadFromFile(os.path.realpath(scene_gt[ss]._medium._medium_path) + '/scene.xml')
+    ##I_gt[ss], gt_grad[ss] = render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
     
-    
+#sio.loadmat('/home/tamarl/MitsubaGradient/mitsuba/crop cloud jpl ground truth grid 8 4 pixels.m.mat')    
+sio.savemat('crop cloud jpl ground truth grid 8 4 pixels 1048576 photons.m', {'beta_gt': beta_gt, 'I_gt': I_gt, 'scene_gt': scene_gt, 'gt_grad':gt_grad})
 
 for bb in range(len(beta0_diff)):
     # optimizer parameters - ADAM
     first_moment  = 0 #m0
     second_moment = 0 #v0
 
-    beta0 = np.ones(beta_gt.shape) * beta0_diff[bb]
+    beta0 = beta_gt + np.ones(beta_gt.shape) * beta0_diff[bb]
 
     # for now beta is not a Spectrum:
     inner_grad_float = np.zeros((n_unknowns, 1))
@@ -245,7 +249,7 @@ for bb in range(len(beta0_diff)):
 
     for iteration in range(max_iterations):               
         betas[bb, iteration] = beta.flatten('F')                
-        cost_grad            = np.zeros((grid_size, n_pixels_w, n_pixels_h))                     
+        cost_grad            = np.zeros(grid_size)                     
 
         for ss in range(n_sensors):
             # Create scene with given beta
@@ -254,17 +258,17 @@ for bb in range(len(beta0_diff)):
                                             up=sensors_pos[ss]['up'], nSamples=Np_vector[0], sensorType='perspective', fov_f=True,
                                             bounding_box=bounds, width=n_pixels_w, height=n_pixels_h)
             
-            #[ I_algo[ss, bb, iteration], inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size,
-                                                                     #n_pixels_w, n_pixels_h)
+            [ I_algo[ss, bb, iteration], inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size,
+                                                                     n_pixels_w, n_pixels_h)
             
-            scene        = sceneLoadFromFile(os.path.realpath(algo_scene[ss]._medium._medium_path) + '/scene.xml')
-            [ I_algo[ss, bb, iteration], inner_grad ] = render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)            
+            #scene        = sceneLoadFromFile(os.path.realpath(algo_scene[ss]._medium._medium_path) + '/scene.xml')
+            #[ I_algo[ss, bb, iteration], inner_grad ] = render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)            
 
             ### beta is not a Spectrum, for now:
             inner_grad_float = np.mean(inner_grad, 1)
 
             tmp        =  (-1) * ( I_algo[ss, bb, iteration] - I_gt[ss] )                    
-            cost_grad += np.matmul(inner_grad_float, tmp)
+            cost_grad += np.sum(np.sum(inner_grad_float * tmp, 2), 1)
 
         cost_gradient[bb, iteration] = cost_grad
 
@@ -281,31 +285,31 @@ for bb in range(len(beta0_diff)):
         beta -= alpha * first_moment_bar / (np.sqrt(second_moment_bar) + epsilon)    
 
         if beta[beta <= 0].size:
-            beta[beta <= 0] = 0.1
+            beta_before = beta + alpha * first_moment_bar / (np.sqrt(second_moment_bar) + epsilon)    
+            beta[beta <= 0] = beta_before[beta <= 0]
             print('fixed beta!')
 
         end = time.time()
 
         runtime[bb, iteration] = end - start 
-
-scheduler.stop()
-
-out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/plot_tmp_cmp/small_cloud/'
-
-for bb in range(len(beta0_diff)):    
+    
+    out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/small cloud/'
+        
     bb0 = beta0_diff[bb]                   
     diff = 0
     for ss in range(n_sensors):
-        for pp in range(n_pixels): ##TBD?
-            ppx, ppy = np.unravel_index(pp, (n_pixels_h, n_pixels_w))
-            diff    += np.squeeze( I_gt[ss, ppx, ppy] * np.ones(I_algo[ss, bb, :, ppx, ppy].shape) - I_algo[ss, bb, :, ppx, ppy] ) ##TBD
+        diff += np.sum(np.sum( I_gt[ss] * np.ones(I_algo[ss, bb].shape) - I_algo[ss, bb], 2 ), 1) ##TBD
             
     cost     = 0.5 * diff**2
-    gradient = np.mean(cost_gradient[0, bb], 2)   
-    betas_err = (betas[bb] - beta_gt_flat) / beta_gt_flat * 100 # np.repmat(beta_gt)
+    gradient = cost_gradient[bb]
+    tmp = np.ones(beta_gt_flat.shape)
+    tmp[beta_gt_flat >0] = beta_gt_flat[beta_gt_flat >0]    
+    betas_err = (betas[bb] - beta_gt_flat) / tmp * 100 # np.repmat(beta_gt)
     
-    out_name = 'small cloud ' + sensors_s + ' dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam beta0 ' + str(bb0) + alpha_s + beta1_s + beta2_s + additional_str + '_' + str(un + 1) + ' photonSpec_F.mat'
+    out_name = out_path+'_small cloud jpl density grid 8 4 pixels ' + sensors_s + ' dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam beta0 ' + str(bb0)+' photonSpec_F.mat'
     sio.savemat(out_name, {'beta': beta, 'beta0': beta0_diff[bb], 'runtime': runtime, 'gradient': gradient, 
                            'cost': cost, 'betas_err':betas_err, 'I_algo': I_algo[:, bb]})
     
+scheduler.stop()
+
 print('end')
