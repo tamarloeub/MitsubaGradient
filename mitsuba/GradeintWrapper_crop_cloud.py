@@ -10,8 +10,10 @@ import numpy as np
 from struct import pack, unpack
 import re, time
 import scipy.io as sio
+import matplotlib.pyplot as plt
 
 from mtspywrapper import *
+
 def sceneLoadFromFile(xml_filename):
     # Get a reference to the thread's file resolver
     fileResolver = Thread.getThread().getFileResolver()
@@ -157,27 +159,29 @@ max_val        = np.max(beta_gt_flat)
 grid_size      = np.prod(beta_gt.shape)
 
 # sensors parameters
-n_sensors  = 3
+n_sensors  = 9
 n_pixels_w = 2 #TBD
 n_pixels_h = 2 #TBD
 n_pixels   = n_pixels_h * n_pixels_w
 
 # optimizer parameters - ADAM
-alpha   = 0.01 # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; alpha = 10**(r)                                - randomly selected from a logaritmic scale
+# randomly select alpha and beta 1 hyperparameters
+n_adam_hyp_params = 3
+r      = np.random.uniform(-4, 0, n_adam_hyp_params) # -4 * np.random.rand(n_adam_hyp_params)
+alphas = 10**r                                       # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; 
+                                                     #  alpha = 10**(r), then r is in [-a, 0] - randomly selected from a logaritmic scale 
+
+#alpha   = 0.01 # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; alpha = 10**(r)                                - randomly selected from a logaritmic scale
 beta1   = 0.9  # randomly select beta1 hyperparameter -> sample (1-beta1), r = -a * np.random.uniform(-3, -1) ; beta1 = 1 - 10**(r) - randomly selected from a logaritmic scale
 epsilon = 1e-8
 beta2   = 0.999
 
 Np_vector     = np.array([512]) * 128#np.array([8192 / 4])
 scene_gt      = [ None ] * n_sensors # create an empty list
-algo_scene    = [ None ] * n_sensors # create an empty list
 sensors_pos   = [ None ] * n_sensors # create an empty list
 gt_grad       = np.zeros((n_sensors, grid_size, 3, n_pixels_h, n_pixels_w))
 I_gt          = np.zeros((n_sensors, n_pixels_h, n_pixels_w))
-I_algo        = np.zeros((n_sensors, len(beta0_diff), max_iterations, n_pixels_h, n_pixels_w))
-runtime       = np.zeros((len(beta0_diff), max_iterations))
-cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))#, n_pixels_h, n_pixels_w))
-betas         = np.zeros((len(beta0_diff), max_iterations, grid_size))
+
 
 f_multi         = True
 output_filename = 'renderedResult'
@@ -193,21 +197,20 @@ for i in range(0, n_cores):
     scheduler.registerWorker(LocalWorker(i, 'wrk%i' % i))
 scheduler.start()
 
-import matplotlib.pyplot as plt
 additional_str = 'crop cloud'
 
 if n_sensors > 1:
     sensors_s = ' ' + str(n_sensors) + ' sensors'
 else:
     sensors_s = ''
-
+        
 TOA      = bounds[5]
 H        = z_spacing * 2
 t_const  = np.array([0, 0, TOA])
 up_const = np.array([-1, 0, 0])
 
 # Ground Truth:
-sensors_radius = nx * x_spacing / 2
+sensors_radius = x_spacing * (nx + 1) / 2
 o = np.zeros((n_sensors, 3))
 o[0] = np.array([0, 0, TOA + H]) 
 for ss in range(n_sensors - 1):
@@ -222,94 +225,149 @@ for ss in range(n_sensors):
     
     scene_gt[ss] = pyScene()
     scene_gt[ss].create_new_scene(beta=beta_gt, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
-                                  up=sensors_pos[ss]['up'], nSamples=Np_vector[0]*4*4, sensorType='perspective', bounding_box=bounds, fov_f=True, 
-                                  width=n_pixels_w, height=n_pixels_h)
+                                  up=sensors_pos[ss]['up'], nSamples=Np_vector[0]*4*4, sensorType='perspective', bounding_box=bounds,
+                                  fov_f=True, width=n_pixels_w, height=n_pixels_h)
 
     I_gt[ss], gt_grad[ss] = render_scene(scene_gt[ss]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
 
     ##scene        = sceneLoadFromFile(os.path.realpath(scene_gt[ss]._medium._medium_path) + '/scene.xml')
     ##I_gt[ss], gt_grad[ss] = render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
     
-#sio.loadmat('/home/tamarl/MitsubaGradient/mitsuba/crop cloud jpl ground truth grid 8 4 pixels.m.mat')    
-sio.savemat('crop cloud jpl ground truth grid 8 4 pixels 1048576 photons.m', {'beta_gt': beta_gt, 'I_gt': I_gt, 'scene_gt': scene_gt, 'gt_grad':gt_grad})
+#sio.loadmat('/home/tamarl/MitsubaGradient/mitsuba/crop cloud jpl ground truth grid 8 4 pixels.m.mat')  
+gt_out = 'crop cloud jpl ground truth ' + str(grid_size) + ' grid points ' + str(n_pixels) + ' pixels ' + str(Np_vector[0]*4*4) +' photons.mat'
+sio.savemat(gt_out, {'beta_gt': beta_gt, 'I_gt': I_gt, 'scene_gt': scene_gt, 'gt_grad':gt_grad})
 
-for bb in range(len(beta0_diff)):
-    # optimizer parameters - ADAM
-    first_moment  = 0 #m0
-    second_moment = 0 #v0
-
-    beta0 = beta_gt + np.ones(beta_gt.shape) * beta0_diff[bb]
-
-    # for now beta is not a Spectrum:
-    inner_grad_float = np.zeros((n_unknowns, 1))
-
-    # Gradient descent loop
-    beta  = np.copy(beta0)
-    start = time.time()
-
-    for iteration in range(max_iterations):               
-        betas[bb, iteration] = beta.flatten('F')                
-        cost_grad            = np.zeros(grid_size)                     
-
-        for ss in range(n_sensors):
-            # Create scene with given beta
-            algo_scene[ss] = pyScene()
-            algo_scene[ss].create_new_scene(beta=beta, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
-                                            up=sensors_pos[ss]['up'], nSamples=Np_vector[0], sensorType='perspective', fov_f=True,
-                                            bounding_box=bounds, width=n_pixels_w, height=n_pixels_h)
-            
-            [ I_algo[ss, bb, iteration], inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size,
-                                                                     n_pixels_w, n_pixels_h)
-            
-            #scene        = sceneLoadFromFile(os.path.realpath(algo_scene[ss]._medium._medium_path) + '/scene.xml')
-            #[ I_algo[ss, bb, iteration], inner_grad ] = render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)            
-
-            ### beta is not a Spectrum, for now:
-            inner_grad_float = np.mean(inner_grad, 1)
-
-            tmp        =  (-1) * ( I_algo[ss, bb, iteration] - I_gt[ss] )                    
-            cost_grad += np.sum(np.sum(inner_grad_float * tmp, 2), 1)
-
-        cost_gradient[bb, iteration] = cost_grad
-
-        cost_grad_mat = np.reshape(cost_grad, beta.shape, 'F')
-
-        ## ADAM implementation
-        first_moment  = beta1 * first_moment  + (1 - beta1) * cost_grad_mat
-        second_moment = beta2 * second_moment + (1 - beta2) * cost_grad_mat**2
-        #second_moment = beta2 * second_moment + (1 - beta2) * np.power(cost_grad_mat, 2)
-
-        first_moment_bar  = first_moment  / ( 1 - beta1**(iteration + 1) )
-        second_moment_bar = second_moment / ( 1 - beta2**(iteration + 1) )
-
-        beta -= alpha * first_moment_bar / (np.sqrt(second_moment_bar) + epsilon)    
-
-        if beta[beta <= 0].size:
-            beta_before = beta + alpha * first_moment_bar / (np.sqrt(second_moment_bar) + epsilon)    
-            beta[beta <= 0] = beta_before[beta <= 0]
-            print('fixed beta!')
-
-        end = time.time()
-
-        runtime[bb, iteration] = end - start 
+for aa in range(len(alphas)):
+    alpha = alphas[aa]
     
-    out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/small cloud/'
+    if alpha is not 0.01:
+        alpha_s = ' alpha ' + str(alpha)
+    else:
+        alpha_s = ''
         
-    bb0 = beta0_diff[bb]                   
-    diff = 0
-    for ss in range(n_sensors):
-        diff += np.sum(np.sum( I_gt[ss] * np.ones(I_algo[ss, bb].shape) - I_algo[ss, bb], 2 ), 1) ##TBD
+    algo_scene    = [ None ] * n_sensors # create an empty list
+    I_algo        = np.zeros((n_sensors, len(beta0_diff), max_iterations, n_pixels_h, n_pixels_w))
+    runtime       = np.zeros((len(beta0_diff), max_iterations))
+    cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))
+    betas         = np.zeros((len(beta0_diff), max_iterations, grid_size))
+    
+    for bb in range(len(beta0_diff)):
+        # optimizer parameters - ADAM
+        first_moment  = 0 #m0
+        second_moment = 0 #v0
+    
+        beta0 = beta_gt + np.ones(beta_gt.shape) * beta0_diff[bb]
+    
+        # for now beta is not a Spectrum:
+        inner_grad_float = np.zeros((n_unknowns, 1))
+    
+        # Gradient descent loop
+        beta  = np.copy(beta0)
+        start = time.time()
+    
+        for iteration in range(max_iterations):               
+            betas[bb, iteration] = beta.flatten('F')                
+            cost_grad            = np.zeros(grid_size)                     
+    
+            for ss in range(n_sensors):
+                # Create scene with given beta
+                algo_scene[ss] = pyScene()
+                algo_scene[ss].create_new_scene(beta=beta, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
+                                                up=sensors_pos[ss]['up'], nSamples=Np_vector[0], sensorType='perspective', fov_f=True,
+                                                bounding_box=bounds, width=n_pixels_w, height=n_pixels_h)
+                
+                [ I_algo[ss, bb, iteration], inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size,
+                                                                         n_pixels_w, n_pixels_h)
+                
+                #scene        = sceneLoadFromFile(os.path.realpath(algo_scene[ss]._medium._medium_path) + '/scene.xml')
+                #[ I_algo[ss, bb, iteration], inner_grad ] = render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)            
+    
+                ### beta is not a Spectrum, for now:
+                inner_grad_float = np.mean(inner_grad, 1)
+    
+                tmp        =  (-1) * ( I_algo[ss, bb, iteration] - I_gt[ss] )                    
+                cost_grad += np.sum(np.sum(inner_grad_float * tmp, 2), 1)
+    
+            cost_gradient[bb, iteration] = cost_grad
+    
+            cost_grad_mat = np.reshape(cost_grad, beta.shape, 'F')
+    
+            ## ADAM implementation
+            first_moment  = beta1 * first_moment  + (1 - beta1) * cost_grad_mat
+            second_moment = beta2 * second_moment + (1 - beta2) * cost_grad_mat**2
+            #second_moment = beta2 * second_moment + (1 - beta2) * np.power(cost_grad_mat, 2)
+    
+            first_moment_bar  = first_moment  / ( 1 - beta1**(iteration + 1) )
+            second_moment_bar = second_moment / ( 1 - beta2**(iteration + 1) )
+    
+            beta -= alpha * first_moment_bar / (np.sqrt(second_moment_bar) + epsilon)    
+    
+            if beta[beta <= 0].size:
+                beta_before = beta + alpha * first_moment_bar / (np.sqrt(second_moment_bar) + epsilon)    
+                beta[beta <= 0] = beta_before[beta <= 0]
+                print('fixed beta!')
+    
+            end = time.time()
+    
+            runtime[bb, iteration] = end - start 
+    
+    out_path = '/home/tamarl/MitsubaGradient/Gradient wrapper/small cloud/jpl/'
+    
+    for bb in range(len(beta0_diff)):        
+        bb0 = beta0_diff[bb]                   
+        diff = 0
+        for ss in range(n_sensors):
+            diff += np.sum(np.sum( I_gt[ss] * np.ones(I_algo[ss, bb].shape) - I_algo[ss, bb], 2 ), 1) ##TBD
+                
+        cost     = 0.5 * diff**2
+        gradient = cost_gradient[bb]
+        #tmp = np.ones(beta_gt_flat.shape)
+        #tmp[beta_gt_flat >0] = beta_gt_flat[beta_gt_flat >0]    
+        betas_err = (betas[bb] - beta_gt_flat) / beta_gt_flat * 100 # np.repmat(beta_gt)
+        
+        out_name = 'small cloud jpl ' + str(grid_size) + ' grid points ' + str(n_pixels) + ' pixels ' + sensors_s +  ' sensors dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam alpha ' + alpha_s +' photonSpec_F'
+        sio.savemat(out_path + out_name + '.mat', {'betas': betas, 'beta0': beta0_diff[bb], 'runtime': runtime, 'gradient': gradient, 
+                               'cost': cost, 'betas_err':betas_err, 'I_algo': I_algo[:, bb]})
+        
+        iters = np.linspace(1, max_iterations, max_iterations)    
+                
+        plt.figure(figsize=(19,9))    
+    
+        plt.plot(iters, cost, '--',  marker='o', markersize=5)
+        plt.title('Cost', fontweight='bold')  
+        plt.grid(True)
+        plt.xlim(left=0)
+        plt.savefig(out_path + out_name + ' cost.png', dpi=300)            
+        
+        for un_ in range(8):
+            gradient = cost_gradient[bb_,:, un_]        
+            betas_un  = betas[ bb_, :, un_] 
             
-    cost     = 0.5 * diff**2
-    gradient = cost_gradient[bb]
-    tmp = np.ones(beta_gt_flat.shape)
-    tmp[beta_gt_flat >0] = beta_gt_flat[beta_gt_flat >0]    
-    betas_err = (betas[bb] - beta_gt_flat) / tmp * 100 # np.repmat(beta_gt)
-    
-    out_name = out_path+'_small cloud jpl density grid 8 4 pixels ' + sensors_s + ' dependent grad and fwd Np '+ str(Np_vector[0]) + ' adam beta0 ' + str(bb0)+' photonSpec_F.mat'
-    sio.savemat(out_name, {'beta': beta, 'beta0': beta0_diff[bb], 'runtime': runtime, 'gradient': gradient, 
-                           'cost': cost, 'betas_err':betas_err, 'I_algo': I_algo[:, bb]})
-    
-scheduler.stop()
+            plt.figure(figsize=(19,9))
+        
+            plt.subplot(2, 2, 4)
+            plt.plot(iters, gradient, '--',  marker='o', markersize=5)
+            plt.title('Gradient', fontweight='bold')
+            plt.xlabel('iteration')                
+            plt.grid(True)
+            plt.xlim(left=0)
+        
+            plt.subplot(2, 2, 2)
+            plt.plot(iters, betas_un, '--',  marker='o', markersize=5)
+            plt.title('Beta', fontweight='bold')
+            plt.grid(True)
+            plt.xlim(left=0)
+        
+            plt.subplot(1, 2, 1)
+            plt.plot(iters, betas_err[:, un_], '--',  marker='o', markersize=5)
+            plt.title('Beta error', fontweight='bold')
+            plt.xlabel('iteration')
+            plt.ylabel('[%]', fontweight='bold')
+            plt.grid(True)
+            plt.xlim(left=0)    
+        
+            plt.savefig(out_path + out_name + ' photo ' + str(un_+1) + '.png', dpi=300)
+            
+scheduler.stop()    
 
 print('end')
