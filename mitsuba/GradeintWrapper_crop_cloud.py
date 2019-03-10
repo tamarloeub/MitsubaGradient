@@ -167,7 +167,7 @@ n_pixels   = n_pixels_h * n_pixels_w
 # optimizer parameters - ADAM
 # randomly select alpha and beta 1 hyperparameters
 n_adam_hyp_params = 3
-r      = np.random.uniform(-4, 0, n_adam_hyp_params) # -4 * np.random.rand(n_adam_hyp_params)
+r      = np.random.uniform(-4, -1, n_adam_hyp_params) # -4 * np.random.rand(n_adam_hyp_params)
 alphas = 10**r                                       # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; 
                                                      #  alpha = 10**(r), then r is in [-a, 0] - randomly selected from a logaritmic scale 
 
@@ -228,14 +228,17 @@ for ss in range(n_sensors):
                                   up=sensors_pos[ss]['up'], nSamples=Np_vector[0]*4*4, sensorType='perspective', bounding_box=bounds,
                                   fov_f=True, width=n_pixels_w, height=n_pixels_h)
 
-    I_gt[ss], gt_grad[ss] = render_scene(scene_gt[ss]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
+    #I_gt[ss], gt_grad[ss] = render_scene(scene_gt[ss]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
 
     ##scene        = sceneLoadFromFile(os.path.realpath(scene_gt[ss]._medium._medium_path) + '/scene.xml')
     ##I_gt[ss], gt_grad[ss] = render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
     
-#sio.loadmat('/home/tamarl/MitsubaGradient/mitsuba/crop cloud jpl ground truth grid 8 4 pixels.m.mat')  
 gt_out = 'crop cloud jpl ground truth ' + str(grid_size) + ' grid points ' + str(n_pixels) + ' pixels ' + str(Np_vector[0]*4*4) +' photons.mat'
+
 sio.savemat(gt_out, {'beta_gt': beta_gt, 'I_gt': I_gt, 'scene_gt': scene_gt, 'gt_grad':gt_grad})
+
+gt = sio.loadmat(gt_out)  
+I_gt = gt['I_gt']
 
 for aa in range(len(alphas)):
     alpha = alphas[aa]
@@ -340,8 +343,8 @@ for aa in range(len(alphas)):
         plt.savefig(out_path + out_name + ' cost.png', dpi=300)            
         
         for un_ in range(8):
-            gradient = cost_gradient[bb_,:, un_]        
-            betas_un  = betas[ bb_, :, un_] 
+            gradient = cost_gradient[bb,:, un_]        
+            betas_un  = betas[ bb, :, un_] 
             
             plt.figure(figsize=(19,9))
         
