@@ -13,17 +13,17 @@ class pyScene(object):
         self._pmgr   = PluginManager.getInstance()
         self._medium = None
         self._sensor = None
-        
+
         self._scene_set      = False        
         self._integrator_str = None
         self._emitter_str    = None
-        
+
     def get_scene_beta(self):
         if self._medium == None:
             return None
         medium = self._medium
         return medium.get_density_data()
-    
+
     def calculate_fov(self, points):
         #bounds = [xmin, ymin, zmin, xmax, ymax, zmax]
         # fov is set by axis x
@@ -35,7 +35,7 @@ class pyScene(object):
         #center_TOA[2] = max_medium[2]
         focal_point   = np.array([points['target'][0], points['target'][1], points['target'][2]])
         sensor_origin = np.array([points['origin'][0], points['origin'][1], points['origin'][2]])
-        
+
         #L       = (max_medium[0] - min_medium[0]) / 2 #camera's FOV covers the whole medium
         #H       = np.linalg.norm(sensor_origin - center_TOA)
         L       = np.max([max_medium[0] - min_medium[0], max_medium[1] - min_medium[1]]) / 2 #camera's FOV covers the whole medium
@@ -43,7 +43,7 @@ class pyScene(object):
         fov_rad = 2 * np.arctan(L / H)
         fov_deg = 180 * fov_rad / np.pi
         return fov_deg
-    
+
     def set_sensor_film_sampler(self, sensorType, points, nSamples, fov_f=False, fov=None, width=None, height=None):        
         # Create a sensor, film & sample generator
         self._sensor = pySensor()
@@ -55,11 +55,12 @@ class pyScene(object):
         self._sensor.set_medium(self._medium)
         if sensorType is 'perspective':
             if (fov is None) and (fov_f is True):
-                #esle use Mitsuba's default FOV
+                #else use Mitsuba's default FOV
                 fov = self.calculate_fov(points)
+            if fov is not None:
                 self._sensor.set_fov(fov)
             self._sensor.set_film(width=width, height=height)
-               
+
     def set_integrator(self):
         # Create integrator
         self._integrator_str = self._pmgr.create({
@@ -72,9 +73,9 @@ class pyScene(object):
         self._emitter_str = self._pmgr.create({
             'type' : 'directional',
             'direction' : Vector(0, 0, -1),
-            'intensity' : Spectrum(1)
+            'irradiance' : Spectrum(100)
         })
-            
+
     def set_medium(self, beta, albedo=None, bounding_box=None, g=None):    
         # Create medium with bounding box
         self._medium = pyMedium()
@@ -84,68 +85,68 @@ class pyScene(object):
             albedo = 1             
         self._medium.set_phase(g)
         self._medium.set_albedo(albedo)
-    
+
         # Define the extinction field (\beta) in [km^-1]
         if bounding_box is None:
             bounding_box = [-1, -1, -1, 1, 1, 1]   # [xmin, ymin, zmin, xmax, ymax, zmax] in km units 
             #bounding_box = [-250, -250, 0, 250, 250, 400]
-        
+
         beta_parameter = 0.9
         if isinstance(beta, int):
             beta = float(beta)
-        
+
         if isinstance(beta, float):
             beta_parameter = beta
             beta = ()
-            
+
         if beta == ():
             res                   = [2, 2, 2]               # [xres, yrex, zres]
             geometrical_thickness = bounding_box[5] - bounding_box[2]
             tau  = beta_parameter * geometrical_thickness * np.ones(res)
             beta = tau / geometrical_thickness    
-    
+
         self._medium.set_density(beta, bounding_box)   
-        
+
     def set_scene(self, beta=(), albedo=None, sensorType=None, points=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, bounding_box=None, g=None):
         if points is None:
             points = dict()
             points['origin'] = Point(0, 0, 3)
             points['target'] = Point(0, 0, 1)            
             points['up']     = Vector(1, 0, 0)   
-            
+
         if points['origin'] is None:
             points['origin'] = Point(0, 0, 3)            
         if points['target'] is None:
             points['target'] = Point(0, 0, 1)
         if points['up']     is None:
             points['up']     = Vector(1, 0, 0)           
-            
+
         self.set_medium(beta, albedo, bounding_box, g)
         self.set_sensor_film_sampler(sensorType, points, nSamples, fov_f, fov, width, height)        
         self.set_integrator()
         self.set_emitter()
         self._scene_set = True
-        
+
     def configure_scene(self, scene_type='smallMedium'):            
         # Set the sensor, film & sample generator
         self._scene.addChild(self._sensor.sensor_to_mitsuba())        
-    
+
         # Set the integrator
         self._scene.addChild(self._integrator_str)
 
         # Set the emiter - light source
         self._scene.addChild(self._emitter_str)
-        
+
         # Set bounding box
         self._scene.addChild(self._medium.bounding_box_to_mitsuba(scene_type))    
-    
+
         # Set medium
         self._scene.addChild(self._medium.medium_to_mitsuba(scene_type))  
-            
+
         self._scene.configure()        
-        
+
         return self._scene
-    
+
     def create_new_scene(self, beta=(), albedo=None, sensorType=None, origin=None, target=None, up=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, scene_type='smallMedium', bounding_box=None, g=None):
         if (origin is not None) and (target is not None) and (up is not None):
             points           = dict()
@@ -158,35 +159,35 @@ class pyScene(object):
         self.configure_scene(scene_type)
         self.scene_to_xml()
         return
-        
+
     def copy_scene(self):
         new_scene         = pyScene()
         new_scene._medium = self._medium
         new_scene._sensor = self._sensor
-        
+
         new_scene._scene_set      = self._scene_set
         new_scene._integrator_str = self._integrator_str
         new_scene._emitter_str    = self._emitter_str
         return new_scene
-        
+
     def copy_scene_with_different_density(self, beta):
         assert (self._scene_set is True), "Can't copy unset scene"
         new_scene = self.copy_scene()        
         new_scene.set_medium(beta)
         new_scene.configure_scene()
         return new_scene
-    
+
     def copy_scene_with_different_sensor_position(self, origin, target, up, nSamples=None):
         assert (self._scene_set is True), "Can't copy unset scene"
         if nSamples is None:
             sampler = self._sensor.get_sampler()
             nSamples = sampler.get_sample_count()
-            
+
         points           = dict()
         points['origin'] = origin
         points['target'] = target            
         points['up']     = up                    
-            
+
         new_scene  = self.copy_scene() 
         sensorType = self._sensor.get_type()
         fov        = self._sensor.get_fov()
@@ -204,14 +205,14 @@ class pyScene(object):
                 'x'    : '0',
                 'y'    : '0',
                 'z'    : '-1'
-            },
+                },
             'spectrum' : {
                 'name'  : 'irradiance',
-                'value' : '1'
+                'value' : '100'
             }
         }
         return dictionary
-    
+
     def integrator_to_dict(self):
         dictionary = {
             'type'    : 'volpath_simple',
@@ -221,7 +222,7 @@ class pyScene(object):
             }
         }
         return dictionary      
-                             
+
     def to_dict(self):
         dictionary = {
             'version'    : '0.5.0',
@@ -232,14 +233,14 @@ class pyScene(object):
             'integrator' : self.integrator_to_dict()                                
         }
         return dictionary
-    
+
     def xml_rec(self, elem, dictionary):
         for atr in dictionary.keys():
             if type(atr) == tuple:
                 atr_temp = atr[0]
             else:
                 atr_temp = atr
-                
+
             if type(dictionary[atr]) == dict:
                 sub_elem = ET.SubElement(elem,atr_temp)
                 sub_elem = self.xml_rec(sub_elem,dictionary[atr])
@@ -250,7 +251,7 @@ class pyScene(object):
                     value = dictionary[atr]
                 elem.set(atr, value)
         return elem
-    
+
     def scene_to_xml(self):
         filename  = os.path.realpath(self._medium._medium_path) + '/scene.xml'
         f         = open(filename, 'w')         
@@ -261,5 +262,4 @@ class pyScene(object):
         f.write(xml_txt)
         f.close()
         return filename
-    
-    
+

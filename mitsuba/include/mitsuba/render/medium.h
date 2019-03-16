@@ -164,7 +164,7 @@ public:
 		Sampler *sampler = NULL) const = 0;
 
 	// Tamar
-//	virtual int getDensityVolumeSize() const;
+	virtual size_t getDensityVolumeSize() const=0;
 
 	virtual void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out) const = 0;
 

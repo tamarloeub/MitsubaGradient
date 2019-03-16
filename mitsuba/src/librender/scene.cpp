@@ -34,11 +34,6 @@ Scene::Scene()
 	m_kdtree = new ShapeKDTree();
 	m_sourceFile = new fs::path();
 	m_destinationFile = new fs::path();
-
-	// Tamar
-	int gridSize = 8;
-	m_densityDerivative.resize(gridSize);
-	std::fill(m_densityDerivative.begin(), m_densityDerivative.end(), Spectrum(0.0f));
 }
 
 Scene::Scene(const Properties &props)
@@ -83,10 +78,6 @@ Scene::Scene(const Properties &props)
 		m_kdtree->setMaxBadRefines(props.getInteger("kdMaxBadRefines"));
 	m_sourceFile = new fs::path();
 	m_destinationFile = new fs::path();
-	// Tamar
-	int gridSize = 8;
-	m_densityDerivative.resize(gridSize);
-	std::fill(m_densityDerivative.begin(), m_densityDerivative.end(), Spectrum(0.0f));
 }
 
 Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
@@ -111,8 +102,12 @@ Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
 	m_degenerateSensor = scene->m_degenerateSensor;
 	m_degenerateEmitters = scene->m_degenerateEmitters;
 	// Tamar
-	int gridSize = 8;
-	m_densityDerivative.resize(gridSize);
+	Medium* medium_s = scene->m_media.begin()->get();
+	m_gridSize = medium_s->getDensityVolumeSize();
+	Vector2i filmSize = m_sensor->getFilm()->getSize();
+	m_nPixels = filmSize.x * filmSize.y;
+	m_total_grad = scene->m_total_grad;
+	m_densityDerivative.resize(m_gridSize);
 	std::fill(m_densityDerivative.begin(), m_densityDerivative.end(), Spectrum(0.0f));
 }
 
@@ -174,8 +169,11 @@ Scene::Scene(Stream *stream, InstanceManager *manager)
 	for (size_t i=0; i<count; ++i)
 		m_netObjects.push_back(static_cast<NetworkedObject *>(manager->getInstance(stream)));
 	// Tamar
-	int gridSize = 8;
-	m_densityDerivative.resize(gridSize);
+	Vector2i filmSize = this->getSensor()->getFilm()->getSize();
+	m_nPixels = filmSize.x * filmSize.y;
+	Medium* medium_s = m_media.begin()->get();
+	m_gridSize = medium_s->getDensityVolumeSize();
+	m_densityDerivative.resize(m_gridSize);
 	std::fill(m_densityDerivative.begin(), m_densityDerivative.end(), Spectrum(0.0f));
 
 	initialize();
@@ -455,6 +453,11 @@ bool Scene::preprocess(RenderQueue *queue, const RenderJob *job,
 			it != m_ssIntegrators.end(); ++it)
 		(*it)->setActive(true);
 
+	Vector2i filmSize = m_sensor->getFilm()->getSize();//this->getSensor()->getFilm()->getSize()
+	m_nPixels = filmSize.x * filmSize.y;
+	Medium* medium_s = m_media.begin()->get();
+	m_gridSize = medium_s->getDensityVolumeSize();
+	m_total_grad = new Float[m_gridSize * m_nPixels];
 	return true;
 }
 

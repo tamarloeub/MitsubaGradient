@@ -166,22 +166,13 @@ public:
 				return 0;
 		}
 	}
+	
+	size_t getVoxelsSize() const {
+		size_t nEntries = (size_t) m_res.x
+			* (size_t) m_res.y * (size_t) m_res.z;
+		return 	nEntries;
+	}
 
-	// Tamar
-//	int* getVolumeSizeVec() const {
-//		return { m_res.x,  m_res.y,  m_res.z };
-
-		// Tamar - do we need to consider that?/
-//		switch (m_volumeType) {
-//			case EFloat32: return 4 * nEntries * m_channels;
-//			case EFloat16: return 2 * nEntries * m_channels;
-//			case EUInt8:   return 1 * nEntries * m_channels;
-//			case EQuantizedDirections:  return 2 * nEntries;
-//			default:
-//				Log(EError, "Unknown volume format!");
-//				return 0;
-//		}
-//	}
 	void serialize(Stream *stream, InstanceManager *manager) const {
 		VolumeDataSource::serialize(stream, manager);
 

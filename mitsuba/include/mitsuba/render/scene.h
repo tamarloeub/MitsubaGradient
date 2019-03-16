@@ -1106,6 +1106,15 @@ public:
 	//Tamar
 	inline const std::vector<Spectrum> &getDensityDerivative() const { return m_densityDerivative; }
 
+	inline const Float getTotalGradient_f(int i) const { return m_total_grad[i]; }
+
+	inline const int getTotalImageSize() const { return m_nPixels; }
+	inline const int getTotalGridSize() const { return m_gridSize; }
+
+	void setTotalGradient(Float grad_f, int index, int i) {
+		m_total_grad[m_gridSize * index + i] = grad_f;
+	}
+
 	/// Return the name of the file containing the original description of this scene
 	inline const fs::path &getSourceFile() const { return *m_sourceFile; }
 	/// Set the name of the file containing the original description of this scene
@@ -1170,7 +1179,9 @@ private:
 	bool m_degenerateEmitters;
 	//Tamar
 	std::vector<Spectrum> m_densityDerivative;
-
+	Float* m_total_grad;
+	int m_gridSize;
+	int m_nPixels;
 
 };
 

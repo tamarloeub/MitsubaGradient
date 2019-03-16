@@ -320,6 +320,12 @@ public:
 	Float getMaximumFloatValue() const {
 		return m_nested->getMaximumFloatValue();
 	}
+	
+	//Tamar
+	size_t getVoxelsSize() const {
+		Log(EError, "const volume: does not implement getVolumeSize()!");
+		return 0;
+	}
 
 	MTS_DECLARE_CLASS()
 protected:

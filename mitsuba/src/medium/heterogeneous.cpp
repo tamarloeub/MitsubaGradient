@@ -319,11 +319,9 @@ public:
 	}
 
 	// Tamar
-//	int getDensityVolumeSize() const {
-//		int val = 8;
-//		return val;
-////		return m_density->getVolumeSize();
-//	}
+	size_t getDensityVolumeSize() const {
+		return m_density->getVoxelsSize();
+	}
 
 	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out) const {
 		// int* volSize = m_density->getVolumeSizeVec();

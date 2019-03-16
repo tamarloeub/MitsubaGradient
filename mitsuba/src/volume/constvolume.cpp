@@ -142,7 +142,11 @@ public:
 		oss << "]";
 		return oss.str();
 	}
-
+	//Tamar
+	size_t 	getVoxelsSize() const {
+		Log(EError, "const volume: does not implement getVolumeSize()!");
+		return 0;
+	}
 	MTS_DECLARE_CLASS()
 protected:
 	int m_type;

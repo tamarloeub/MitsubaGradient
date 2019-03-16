@@ -145,6 +145,17 @@ static bp::list scene_getSensors(Scene *scene) {
 	return list;
 }
 
+//Tamar
+static bp::list scene_getTotalGradient(Scene *scene) {
+	bp::list list;
+	int gridSize = scene->getTotalGridSize();
+	int nPixels  = scene->getTotalImageSize();
+	for (int i=0; i<nPixels*gridSize; ++i) {
+		list.append(scene->getTotalGradient_f(i));
+	}
+	return list;
+}
+
 static bp::object scene_getSensor(Scene *scene) { return cast(scene->getSensor()); }
 static bp::object scene_getIntegrator(Scene *scene) { return cast(scene->getIntegrator()); }
 
@@ -393,6 +404,7 @@ void export_render() {
 		.def("getSensor", &scene_getSensor, BP_RETURN_VALUE)
 		.def("setSensor", &Scene::setSensor)
 		.def("getSensors", &scene_getSensors)
+		.def("getTotalGradient", &scene_getTotalGradient)
 		.def("getIntegrator", &scene_getIntegrator, BP_RETURN_VALUE)
 		.def("setIntegrator", &Scene::setIntegrator)
 		.def("getSampler", scene_getSampler, BP_RETURN_VALUE)

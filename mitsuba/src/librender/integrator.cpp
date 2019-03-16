@@ -250,30 +250,25 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			densityDerivative[i] = densityDerivative[i] / Spectrum(sampler->getSampleCount());
 		}
 
-		bool output_to_file = 1;       //redirect densityDerivative to file
-		if (output_to_file) {
-			std::stringstream filename;
-			filename << "output_" << offset[0] << "_" << offset[1] << ".txt";
-			std::ofstream myfile;      //redirect densityDerivative to file
-			myfile.open(filename.str().c_str());
-//			cout << filename.str() << endl;
-//			if (offset[0] == 0) {
-//				if (offset[1] == 0)
-//					myfile.open("output_1.txt"); //redirect densityDerivative to file
-//				else
-//					myfile.open("output_2.txt"); //redirect densityDerivative to file
-//			} else {
-//				if (offset[1] == 0)
-//					myfile.open("output_3.txt"); //redirect densityDerivative to file
-//				else
-//					myfile.open("output_4.txt"); //redirect densityDerivative to file
-//			}
-
-			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-				myfile << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl; //redirect densityDerivative to file
-			}
-			myfile.close(); //redirect densityDerivative to file
+		Scene *scene_notconst = const_cast<Scene*> (rRec.scene);
+		
+		int img_size = rRec.scene->getTotalImageSize();
+		int index = offset[0] * sqrt(img_size) + offset[1];
+		for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
+			scene_notconst->setTotalGradient(densityDerivative[i][0], index, i);
 		}
+
+//		bool output_to_file = 1;       //redirect densityDerivative to file
+//		if (output_to_file) {
+//			std::stringstream filename;
+//			filename << "output_" << offset[0] << "_" << offset[1] << ".txt";
+//			std::ofstream myfile;      //redirect densityDerivative to file
+//			myfile.open(filename.str().c_str());
+//			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
+//				myfile << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl; //redirect densityDerivative to file
+//			}
+//			myfile.close(); //redirect densityDerivative to file
+//		}
 	}
 }
 

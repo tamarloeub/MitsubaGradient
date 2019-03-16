@@ -16,7 +16,7 @@ class pyMedium(object):
         self._scale   = 1
         self._bounding_box = None
         self._shape        = ()
-        self._medium_path  = 'Myscenes/' + datetime.datetime.now().strftime("%y_%m_%d_%H:%M")
+        self._medium_path  = 'Myscenes/' + datetime.datetime.now().strftime("%y_%m_%d_%H:%M:%S:%f")[:-3]
         self._files        = dict()
         self._boundaries   = {'x' : 'open', 'y' : 'open' }    
         self._id           = "OneVoxel"

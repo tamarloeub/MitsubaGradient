@@ -70,6 +70,7 @@ public:
 	 */
 	virtual Float getStepSize() const = 0;
 
+	virtual size_t getVoxelsSize() const =0;
 	/**
 	 * \brief Return the maximum floating point value that
 	 * could be returned by \ref lookupFloat.

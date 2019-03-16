@@ -195,7 +195,12 @@ public:
 	Float getMaximumFloatValue() const {
 		return m_maxFloatValue;
 	}
-
+	//Tamar
+	size_t getVoxelsSize() const {
+		Log(EError, "const volume: does not implement getVolumeSize()!");
+		return 0;
+	}
+	
 	MTS_DECLARE_CLASS()
 protected:
 	std::string m_filename, m_prefix, m_postfix;

@@ -400,10 +400,10 @@ public:
 	}
 
 	// Tamar
-//	int getDensityVolumeSize() const {
-//		Log(EError, "Homogeneous Medium: does not implement getDensityVolumeSize()!");
-//		return 0;
-//	}
+	size_t getDensityVolumeSize() const {
+		Log(EError, "Homogeneous Medium: does not implement getDensityVolumeSize()!");
+		return 0;
+	}
 
 	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out) const {
 		Log(EError, "Homogeneous Medium: does not implement gridDerivative()!");
