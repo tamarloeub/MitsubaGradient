@@ -176,7 +176,7 @@ beta_gt[ind0x, ind0y, ind0z] = 0.01
 beta_gt_flat = beta_gt.flatten('F')
 
 # algorithm parameters
-max_iterations = 500 * 3*2 + 1 #500 *3
+max_iterations = 500 * 3 + 1 #500 *3
 max_val        = np.max(beta_gt_flat)
 grid_size      = np.prod(beta_gt.shape)
 
@@ -195,13 +195,13 @@ n_pixels   = n_pixels_h * n_pixels_w
 #alphas = 10**r                                       # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; 
                                                      #  alpha = 10**(r), then r is in [-a, 0] - randomly selected from a logaritmic scale 
 
-alpha   = 0.01 # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; alpha = 10**(r)                                - randomly selected from a logaritmic scale
+alpha   = 0.08 # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; alpha = 10**(r)                                - randomly selected from a logaritmic scale
 beta1   = 0.9  # randomly select beta1 hyperparameter -> sample (1-beta1), r = -a * np.random.uniform(-3, -1) ; beta1 = 1 - 10**(r) - randomly selected from a logaritmic scale
 epsilon = 1e-8
 beta2   = 0.999
 
 Np_vector  = np.array([512]) * 128#np.array([8192 / 4])
-beta0_diff = np.array([0.01])
+beta0_diff = np.array([50])
 
 sensors_pos   = [ None ] * n_sensors # create an empty list
 algo_scene    = [ None ] * n_sensors # create an empty list
@@ -209,7 +209,7 @@ I_algo        = np.zeros((n_sensors, len(beta0_diff), max_iterations, n_pixels_h
 runtime       = np.zeros((len(beta0_diff), max_iterations))
 cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))
 betas         = np.zeros((len(beta0_diff), max_iterations, grid_size))
-
+cost          = np.zeros((len(beta0_diff), max_iterations))
 output_filename = 'renderedResult'
 
 if f_multi: # Set parallel job or run on 1 cpu only
@@ -311,7 +311,7 @@ start_err = 1.1 # 10 % error
 out_path  = '/home/tamarl/MitsubaGradient/Gradient wrapper/small cloud/jpl/'
 out_name  = 'source emitter radiance 100 small cloud jpl ' + str(grid_size) + ' grid points ' + str(n_unknowns) + ' unknowns ' + str(n_pixels)
 out_name += ' pixels ' + str(n_sensors) + ' sensors all above the medium dependent grad and fwd Np '+ str(Np_vector[0]) 
-out_name += ' cloud mask photonSpec_F beta0 ' 
+out_name += ' adam alpha ' + str(alpha) + ' cloud mask photonSpec_F beta0 ' 
 
 
 for bb in range(len(beta0_diff)):
@@ -331,10 +331,11 @@ for bb in range(len(beta0_diff)):
         betas[bb, iteration] = beta.flatten('F')                
         cost_grad            = np.zeros(grid_size)
 
+        cost_iter = 0
         for ss in range(n_sensors):
             # Create scene with given beta
             algo_scene[ss] = pyScene()
-            algo_scene[ss].create_new_scene(beta=beta, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
+            algo_scene[ss].create_new_scene(beta=np.copy(beta), g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
                                             up=sensors_pos[ss]['up'], nSamples=Np_vector[0] / 2/8, sensorType='perspective', fov=fov_deg,
                                             bounding_box=bounds, width=n_pixels_w, height=n_pixels_h)
             
@@ -343,7 +344,9 @@ for bb in range(len(beta0_diff)):
         
             tmp        =  (-1) * ( I_algo[ss, bb, iteration] - I_gt[ss] )                    
             cost_grad += np.sum(np.sum(inner_grad * tmp, 2), 1)
+            cost_iter += np.linalg.norm(tmp,ord=2)
         
+        cost[bb, iteration] = 0.5 * cost_iter
         cost_grad[ind0f] = 0.0
         
         cost_gradient[bb, iteration] = cost_grad
@@ -368,48 +371,43 @@ for bb in range(len(beta0_diff)):
         runtime[bb, iteration] = end - start
         if (np.mod(iteration, 100) == 0):
             bb0 = beta0_diff[bb]                            
-            sio.savemat(out_path + out_name + str(beta0_diff[bb]) + '.mat', 
-                           { 'runtime' : runtime, 'I_algo': I_algo[:, bb], 'betas' : betas, 'gradient' : cost_gradient[bb],
-                             'iteration' : iteration, 'beta0' : beta0_diff[bb], 'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2, 
-                             'first_moment' : first_moment, 'second_moment' : second_moment } )            
+            sio.savemat(out_path + out_name + str(beta0_diff[bb]) + '.mat', { 'beta0' : beta0_diff[bb], 'iteration' : iteration, 'runtime' : runtime, 
+                                                        'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2, 'cost' : cost,
+                                                        'I_algo': I_algo[:, bb], 'betas' : betas, 'gradient' : cost_gradient[bb], 
+                                                        'first_moment' : first_moment, 'second_moment' : second_moment })            
             
-out_path  = '/home/tamarl/MitsubaGradient/Gradient wrapper/small cloud/jpl/'
 curr_iter = iteration
 I_algo_p  = I_algo[:, :, 0:curr_iter]
 betas_p   = betas[:, 0:curr_iter]
+cost_p    = cost[:, 0:curr_iter]
 
 iters = np.linspace(1, curr_iter, curr_iter)        
 
 for bb in range(len(beta0_diff)):
-    bb0 = beta0_diff[bb]                   
-    diff = 0
-    for ss in range(n_sensors):
-        diff += np.sum(np.sum( I_gt[ss] - I_algo_p[ss, bb], 2 ), 1) ##TBD
-            
-    cost     = 0.5 * diff**2
-    t_2      = np.argmin(cost)    
+    bb0      = beta0_diff[bb]                   
+    t_2      = np.argmin(cost_p[bb])    
     gradient = cost_gradient[bb]
     #tmp      = np.ones(beta_gt.shape)
     #tmp[ind0x, ind0y, ind0z] = beta_gt[ind0x, ind0y, ind0z]    
     tmp_p     = np.reshape(betas_p[bb], [curr_iter, nx, ny, nz], 'F')
     betas_err = (tmp_p - beta_gt) / beta_gt * 100
     
-    out_name  = 'small cloud jpl ' + str(grid_size) + ' grid points ' + str(n_unknowns) + ' unknowns ' + str(n_pixels) + ' pixels '
-    out_name += str(n_sensors) +  ' sensors all above the medium dependent grad and fwd Np '+ str(Np_vector[0]) + ' beta0 '
-    out_name += str(beta0_diff[bb]) + 'cloud mask photonSpec_F'
+    out_name  = 'source emitter radiance 100 small cloud jpl ' + str(grid_size) + ' grid points ' + str(n_unknowns) + ' unknowns ' + str(n_pixels)
+    out_name += ' pixels ' + str(n_sensors) +  ' sensors all above the medium dependent grad and fwd Np '+ str(Np_vector[0]) 
+    out_name += ' beta0 ' + str(beta0_diff[bb]) + ' adam alpha ' + str(alpha) + ' cloud mask photonSpec_F'
     
-    sio.savemat(out_path + out_name + str(beta0_diff[bb]) + '.mat', { 'gradient' : cost_gradient[bb], 'I_algo': I_algo[:, bb], 'betas' : betas, 
-                                                                      'runtime' : runtime, 'iteration' : iteration, 'beta0' : beta0_diff[bb],
+    sio.savemat(out_path + out_name + '.mat', { 'gradient' : cost_gradient[bb], 'I_algo': I_algo[:, bb], 
+                                                                      'betas' : betas, 'runtime' : runtime, 'iteration' : iteration, 
                                                                       'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2, 
-                                                                      'betas_err' : betas_err, 'cost' : cost,
+                                                                      'betas_err' : betas_err, 'cost' : cost, 'beta0' : beta0_diff[bb],
                                                                       'first_moment' : first_moment, 'second_moment' : second_moment }) 
     
     plt.figure(figsize=(19,9))    
-    plt.plot(iters, cost, '--',  marker='o', markersize=5)
+    plt.plot(iters, cost_p[bb], '--',  marker='o', markersize=5)
     plt.title('Cost', fontweight='bold')  
     plt.grid(True)
     plt.xlim(left=0)
-    plt.savefig(out_path + out_name + str(beta0_diff[bb]) + ' cost.png', dpi=300)
+    plt.savefig(out_path + out_name + ' cost.png', dpi=300)
     
     plt.figure(figsize=(19,9))    
     
@@ -445,7 +443,7 @@ for bb in range(len(beta0_diff)):
                       #fontweight='bold')            
         
     plt.suptitle('Beta error [%]', fontweight='bold')
-    plt.savefig(out_path + out_name + str(beta0_diff[bb]) + ' errors heat maps.png', dpi=300)               
+    plt.savefig(out_path + out_name + ' errors heat maps.png', dpi=300)               
     
     plt.figure(figsize=(19,9))    
     
@@ -482,7 +480,7 @@ for bb in range(len(beta0_diff)):
         plt.title('iteration = ' + str(curr_iter))#, fontweight='bold')            
         
     plt.suptitle('Beta values [1/km]', fontweight='bold')
-    plt.savefig(out_path + out_name + str(beta0_diff[bb]) + ' density heat maps.png', dpi=300)     
+    plt.savefig(out_path + out_name + ' density heat maps.png', dpi=300)     
         
     plt.figure(figsize=(19,9))    
     for ss in range(n_sensors):
@@ -496,7 +494,7 @@ for bb in range(len(beta0_diff)):
     
         plt.subplot(n_sensors, 4, 4 * ss + 2)
         plt.imshow(I_algo_p[ss, bb, 0])
-        plt.clim(0, maxc)
+        #plt.clim(0, maxc)
         plt.colorbar()
         plt.axis('off')
         err = sum(sum((I_gt[ss] - I_algo_p[ss, bb, 0])**2))
@@ -518,7 +516,7 @@ for bb in range(len(beta0_diff)):
         err = sum(sum((I_gt[ss] - I_algo_p[ss, bb, -1])**2)) 
         plt.title('Final output, error = ' +  str(round(err, 7)))
     
-    plt.savefig(out_path + out_name + str(beta0_diff[bb]) + ' images from sensors.png', dpi=300)
+    plt.savefig(out_path + out_name + ' images from sensors.png', dpi=300)
     
     #for un_ in range(n_unknowns / 8 / 4):        
         #betas_un  = betas[ bb, :, un_*8*4:un_*8*4+8] 

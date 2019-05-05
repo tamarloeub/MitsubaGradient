@@ -166,7 +166,7 @@ public:
 	// Tamar
 	virtual size_t getDensityVolumeSize() const=0;
 
-	virtual void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out) const = 0;
+	virtual void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out, Float dlength) const = 0; //18_3
 
 	/// Return the phase function of this medium
 	inline const PhaseFunction *getPhaseFunction() const { return m_phaseFunction.get(); }

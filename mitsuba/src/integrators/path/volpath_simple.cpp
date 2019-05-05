@@ -152,8 +152,11 @@ public:
 				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 				// build densityDerivative
 				for(std::vector<int>::size_type i = 0; i != mRec.scoreIndxs.size(); i++) {
-					densityDerivative[mRec.scoreIndxs[i]] += Spectrum(mRec.scoreVals[i] / q);
+					densityDerivative[mRec.scoreIndxs[i]] += Spectrum(mRec.scoreVals[i] * q);
 				}
+				mRec.scoreIndxs.clear();
+				mRec.scoreVals.clear();
+
 				if ((print_out) and (DEBUG_TAMAR)) {
 					for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
 						cout << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl;
@@ -179,9 +182,9 @@ public:
 								PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d));
 						Li += throughput * value * phaseVal;
 						MediumSamplingRecord mdRec;
-						RayDifferential rayD = RayDifferential(mRec.p, mRec.orientation ,mRec.time);
+						RayDifferential rayD = RayDifferential(mRec.p, dRec.d ,mRec.time); //18_3
 
-						rRec.medium->derivateDensity(rayD, mdRec, true, print_out);
+						rRec.medium->derivateDensity(rayD, mdRec, true, print_out, dRec.dist);//18_3
 
 						for(std::vector<int>::size_type i = 0; i != mdRec.scoreIndxs.size(); i++) {
 							if (print_out) {
@@ -189,11 +192,12 @@ public:
 								cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 							}
 
-							densityDerivative[mdRec.scoreIndxs[i]] += Spectrum(mdRec.scoreVals[i] / q);
+							densityDerivative[mdRec.scoreIndxs[i]] += Spectrum(mdRec.scoreVals[i] * phaseVal * q); // * value 
 							if (print_out)
 								cout << densityDerivative[mRec.scoreIndxs[i]].toString() << endl;
 						}
-
+						mdRec.scoreIndxs.clear();
+						mdRec.scoreVals.clear();
 					}
 				}
 
@@ -211,6 +215,7 @@ public:
 				if (phaseVal == 0)
 					break;
 				throughput *= phaseVal;
+				q *= phaseVal; //18_3
 
 				/* Trace a ray in this direction */
 				ray = Ray(mRec.p, pRec.wo, ray.time);
@@ -430,10 +435,11 @@ public:
 				   index boundaries. Stop with at least some probability to avoid
 				   getting stuck (e.g. due to total internal reflection) */
 //				LiRRTmp = Li; //T!
-				q = std::min(throughput.max() * eta * eta, (Float) 0.95f);
-				if (rRec.nextSample1D() >= q)
+				Float q_tmp = std::min(throughput.max() * eta * eta, (Float) 0.95f);
+				if (rRec.nextSample1D() >= q_tmp)
 					break;
-				throughput /= q;
+				q /= q_tmp;
+				throughput /= q_tmp;
 //				RR_f = true; //T!
 			}
 		}

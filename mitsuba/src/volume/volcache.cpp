@@ -163,7 +163,7 @@ public:
 		Log(EInfo, "   Effective storage         = %s", memString((size_t)
 			(totalCells[0]*totalCells[1]*totalCells[2]*sizeof(float)*m_channels)).c_str());
 	}
-
+	
 	Float lookupFloat(const Point &_p) const {
 		const Point p = m_worldToGrid.transformAffine(_p);
 		int x = (int) p.x, y = (int) p.y, z = (int) p.z;

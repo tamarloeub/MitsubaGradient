@@ -323,7 +323,7 @@ public:
 		return m_density->getVoxelsSize();
 	}
 
-	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out) const {
+	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out, Float dlength) const { //18_3
 		// int* volSize = m_density->getVolumeSizeVec();
 		// cout << volSize << endl;
 		// Float devDensity = new Float[volSize[0]][volSize[1]][volSize[2]];
@@ -334,9 +334,13 @@ public:
 		if (!m_densityAABB.rayIntersect(ray, mint, maxt))
 			return;
 
+		float max_alt = m_densityAABB.getCorner(7)[2]; //18_03_2
+
 		mint = std::max(mint, ray.mint);
 		maxt = std::min(maxt, ray.maxt);
 		Float length = maxt-mint, maxComp = 0;
+		if (isDirectRay) //18_3
+			length = dlength; //18_3
 
 		Point p = ray(mint), pLast = ray(maxt);
 
@@ -344,7 +348,7 @@ public:
 		for (int i=0; i<3; ++i)
 			maxComp = std::max(std::max(maxComp,
 				std::abs(p[i])), std::abs(pLast[i]));
-		if (length < 1e-6f * maxComp)
+		if ((length < 1e-6f * maxComp) and (isDirectRay == false)) //18_3
 			return;
 
 		/* Compute a suitable step size */
@@ -391,6 +395,8 @@ public:
 
 		for (uint32_t i=1; i<nSteps + 1; ++i) {
 			// Tamar  - should we deal with anisotrpoic medium like in lookupDensity
+			if (p[2] >= max_alt) //18_03_2
+				break;
 
 			std::fill(inDev.begin(), inDev.end(), 0);
 			std::fill(inIndxs.begin(), inIndxs.end(), 0);
@@ -425,7 +431,7 @@ public:
 			Float density_eps = 1 / 1000;
 			Float factor;
 			Float density_factor;
-			if ( (i == nSteps) && (isDirectRay == false) && (densityAtT > 0) ) {
+			if ( (i == nSteps) && (isDirectRay == false) ){ //&& (densityAtT > 0) ) {
 				// calculating :  inDev *= (1 / betaAtT -stepSize )
 //				std::transform( inDev.begin(), inDev.end(), inDev.begin(), std::bind1st(std::multiplies<float>(), ( 1 / densityAtT - stepSize )) );
 				density_factor = sqrt( pow(densityAtT, 2.0) + pow(density_eps, 2) );
@@ -917,7 +923,7 @@ public:
 					if (print_out)
 						cout << ray.toString() << endl;
 
-					derivateDensity(ray, mRec, false, print_out);
+					derivateDensity(ray, mRec, false, print_out, 0.0); //18_3
 
 //					if ((DEBUG_TAMAR) and (print_out)) {
 //						cout << "sample dist:" << endl;

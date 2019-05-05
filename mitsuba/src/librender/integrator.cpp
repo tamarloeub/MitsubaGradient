@@ -218,6 +218,7 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 
 			Spectrum photonSpec = Li(sensorRay, rRec, Smk, print_out);
 			spec *= photonSpec;
+			//			spec *= Li(sensorRay, rRec, Smk, print_out);
 
 			if ((print_out) and (DEBUG_TAMAR)) {
 				cout << "Smk: " << endl;
@@ -230,6 +231,7 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			}
 			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
 				densityDerivative[i] += Smk[i] * photonSpec; //T! - change back to spec //TBD - put in the desired pixel
+				//				densityDerivative[i] += Smk[i]; // * photonSpec; //T! - change back to spec
 				if ((print_out) and (DEBUG_TAMAR)) {
 					cout << densityDerivative[i].toString() << endl;
 				}

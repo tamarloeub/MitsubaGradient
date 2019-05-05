@@ -405,7 +405,7 @@ public:
 		return 0;
 	}
 
-	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out) const {
+	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out, Float dlength) const { //18_3
 		Log(EError, "Homogeneous Medium: does not implement gridDerivative()!");
 		return;
 	}
