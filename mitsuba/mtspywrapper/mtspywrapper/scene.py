@@ -17,6 +17,7 @@ class pyScene(object):
         self._scene_set      = False        
         self._integrator_str = None
         self._emitter_str    = None
+        self._ocean          = None
 
     def get_scene_beta(self):
         if self._medium == None:
@@ -31,13 +32,9 @@ class pyScene(object):
         max_medium    = np.array([bounds[3], bounds[4], bounds[5]])
         min_medium    = np.array([bounds[0], bounds[1], bounds[2]])
         medium_center = ( max_medium + min_medium ) / 2
-        #center_TOA    = medium_center
-        #center_TOA[2] = max_medium[2]
         focal_point   = np.array([points['target'][0], points['target'][1], points['target'][2]])
         sensor_origin = np.array([points['origin'][0], points['origin'][1], points['origin'][2]])
 
-        #L       = (max_medium[0] - min_medium[0]) / 2 #camera's FOV covers the whole medium
-        #H       = np.linalg.norm(sensor_origin - center_TOA)
         L       = np.max([max_medium[0] - min_medium[0], max_medium[1] - min_medium[1]]) / 2 #camera's FOV covers the whole medium
         H       = np.linalg.norm(sensor_origin - focal_point) 
         fov_rad = 2 * np.arctan(L / H)
@@ -67,7 +64,20 @@ class pyScene(object):
             'type' : 'volpath_simple', 
             'maxDepth' : -1    
         })
-
+    
+    def set_ocean(self):
+        zmin = self._medium._bounding_box[2]
+        zmax = self._medium._bounding_box[-1]
+        tz   = (zmax - zmin)
+        self._ocean = self._pmgr.create({
+            'type' : 'rectangle',
+            'bsdf' : {
+                    'type' : 'diffuse',
+                    'reflectance' : Spectrum(0.05)
+            },
+            'toWorld' : Transform.translate(Vector(0, 0, -tz)).scale(Vector(1., 1.,20.))
+        }) 
+   
     def set_emitter(self):
         # Create a light source
         self._emitter_str = self._pmgr.create({
@@ -125,6 +135,7 @@ class pyScene(object):
         self.set_sensor_film_sampler(sensorType, points, nSamples, fov_f, fov, width, height)        
         self.set_integrator()
         self.set_emitter()
+        self.set_ocean()
         self._scene_set = True
 
     def configure_scene(self, scene_type='smallMedium'):            
@@ -142,6 +153,9 @@ class pyScene(object):
 
         # Set medium
         self._scene.addChild(self._medium.medium_to_mitsuba(scene_type))  
+        
+        # Set ocean
+        self._scene.addChild(self._ocean)        
 
         self._scene.configure()        
 
@@ -212,7 +226,33 @@ class pyScene(object):
             }
         }
         return dictionary
-
+    
+    def ocean_to_dict(self):
+        zmin = self._medium._bounding_box[2]
+        zmax = self._medium._bounding_box[-1]
+        tz   = (zmax - zmin)
+        
+        dictionary = {
+            'type' : 'rectangle',
+            'bsdf' : {
+                'type'  : 'diffuse',                
+                'spectrum' : {
+                    'name' : 'reflectance',
+                    'value' : '0.05'
+                },
+            },
+            'transform' : {
+                'name' : 'toWorld',
+                'scale' : {
+                    'value' : '20'
+                },
+                'translate' : {
+                    'z' : '-' + str(tz)
+                }
+            } 
+        }
+        return dictionary
+    
     def integrator_to_dict(self):
         dictionary = {
             'type'    : 'volpath_simple',
@@ -227,10 +267,11 @@ class pyScene(object):
         dictionary = {
             'version'    : '0.5.0',
             'medium'     : self._medium.to_dict(),
-            'shape'      : self._medium.bounding_to_dict(),
+            ('shape', 0) : self._medium.bounding_to_dict(),
             'sensor'     : self._sensor.to_dict(),
             'emitter'    : self.emitter_to_dict(),
-            'integrator' : self.integrator_to_dict()                                
+            'integrator' : self.integrator_to_dict(),                                
+            ('shape', 1) : self.ocean_to_dict()
         }
         return dictionary
 
