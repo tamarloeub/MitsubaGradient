@@ -265,10 +265,13 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixel
     #outFile.close()
 
     radiance   = np.array(bitmap.buffer()) 
-    inner_grad = np.zeros([grid_size, 3, n_pixels_w, n_pixels_h])
-    for pw in range(n_pixels_w):
-        for ph in range(n_pixels_h):
-            inner_grad[:, :, pw, ph] = get_grad_from_output_file('output_' + str(pw) + '_' + str(ph)+ '.txt')
+    inner_grad_tmp = scene.getTotalGradient()
+    inner_grad_tmp = np.reshape(inner_grad_tmp, [grid_size, n_pixels_w * n_pixels_h], 'F')
+    inner_grad = np.reshape(inner_grad_tmp, [grid_size, n_pixels_w, n_pixels_h])    
+    #inner_grad = np.zeros([grid_size, 3, n_pixels_w, n_pixels_h])
+    #for pw in range(n_pixels_w):
+        #for ph in range(n_pixels_h):
+            #inner_grad[:, :, pw, ph] = get_grad_from_output_file('output_' + str(pw) + '_' + str(ph)+ '.txt')
 
     # End session
     queue.join() 
@@ -310,6 +313,7 @@ for case in range(n_cases):
     I_algo        = np.zeros((n_sensors, len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, n_pixels_h, n_pixels_w))
     runtime       = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations))
     cost_gradient = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, grid_size, n_pixels))
+    cost          = np.zeros((len(beta0_diff), max_iterations))
 
     ## 1 unknown
     #betas         = np.zeros((len(Np_vector), len(beta_gt_factor), len(beta0_diff), max_iterations, n_unknowns))
@@ -497,20 +501,23 @@ for case in range(n_cases):
                         #cost_grad       += inner_grad_float * tmp[:, None] #np.matmul(inner_grad_float, (-1)* np.mean( I_algo[ss][nps][bb_gt][bb][iteration] - I_gt[ss][nps][bb_gt] ))
 
                         ## 4 unknowns
-                        inner_grad_float    = np.mean(inner_grad, 1)
-                        inner_grad_float[0] = (inner_grad_float[0] + inner_grad_float[4]) / 2
-                        inner_grad_float[1] = (inner_grad_float[1] + inner_grad_float[5]) / 2
-                        inner_grad_float[2] = (inner_grad_float[2] + inner_grad_float[6]) / 2
-                        inner_grad_float[3] = (inner_grad_float[3] + inner_grad_float[7]) / 2
-                        inner_grad_float[4] = inner_grad_float[0]
-                        inner_grad_float[5] = inner_grad_float[1]
-                        inner_grad_float[6] = inner_grad_float[2]
-                        inner_grad_float[7] = inner_grad_float[3]
+                        #inner_grad_float    = np.mean(inner_grad, 1)
+                        inner_grad[0] = (inner_grad[0] + inner_grad[4]) / 2
+                        inner_grad[1] = (inner_grad[1] + inner_grad[5]) / 2
+                        inner_grad[2] = (inner_grad[2] + inner_grad[6]) / 2
+                        inner_grad[3] = (inner_grad[3] + inner_grad[7]) / 2
+                        inner_grad[4] = inner_grad[0]
+                        inner_grad[5] = inner_grad[1]
+                        inner_grad[6] = inner_grad[2]
+                        inner_grad[7] = inner_grad[3]
 
                         tmp        =  (-1) * ( I_algo[ss, nps, bb_gt, bb, iteration] - I_gt[ss, nps, bb_gt] ) 
-                        cost_grad += np.sum(np.sum(inner_grad_float * tmp, 2), 1) [:, None]                       
+                        cost_grad += np.sum(np.sum(inner_grad * tmp, 2), 1)[:, None]                       
                         #cost_grad += np.matmul(inner_grad_float, tmp.flatten('F'))[:, None]
                         #cost_grad += inner_grad_float * tmp
+                        cost_iter += np.linalg.norm(tmp,ord=2)				
+
+                    cost[bb, iteration] = 0.5 * cost_iter
 
                     cost_gradient[nps, bb_gt, bb, iteration] = cost_grad
                     ## 1 unknown

@@ -170,9 +170,6 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 	std::vector<Spectrum> densityDerivative = rRec.scene->getDensityDerivative();
 	std::fill(densityDerivative.begin(), densityDerivative.end(), Spectrum(0.0));
 
-//	int size_der = ;
-	std::vector<Spectrum> Smk(densityDerivative.size());
-
 	for (size_t i = 0; i<points.size(); ++i) {
 		Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
 		if (stop)
@@ -186,10 +183,13 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 			}
 		}
 
+		bool print_out = false;
+
 		for (size_t j = 0; j<sampler->getSampleCount(); j++) {
 			rRec.newQuery(queryType, sensor->getMedium());
 			Point2 samplePos(Point2(offset) + Vector2(rRec.nextSample2D()));
 
+			std::vector<Spectrum> Smk(densityDerivative.size());
 			std::fill(Smk.begin(), Smk.end(), Spectrum(0.0));
 
 			if (needsApertureSample)
@@ -202,54 +202,18 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 
 			sensorRay.scaleDifferential(diffScaleFactor);
 
-			bool print_out = false;
-//			if (j == 0) {
-//				print_out = true;
-//				DEBUG_TAMAR = true;
-//			} else {
-//				print_out = false;
-//				DEBUG_TAMAR = false;
-//			}
+			spec *= Li(sensorRay, rRec, Smk, print_out);
 
-			if ((print_out) and (DEBUG_TAMAR)){
-				cout << endl;
-				cout << "sample " << j << endl;
-			}
-
-			Spectrum photonSpec = Li(sensorRay, rRec, Smk, print_out);
-			spec *= photonSpec;
-			//			spec *= Li(sensorRay, rRec, Smk, print_out);
-
-			if ((print_out) and (DEBUG_TAMAR)) {
-				cout << "Smk: " << endl;
-				for(std::vector<int>::size_type i = 0; i != Smk.size(); i++) {
-					cout << Smk[i].toString() << endl;
-				}
-			}
-			if ((print_out) and (DEBUG_TAMAR)){
-				cout << "densityDerivative: " << endl;
-			}
 			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-				densityDerivative[i] += Smk[i] * photonSpec; //T! - change back to spec //TBD - put in the desired pixel
-				//				densityDerivative[i] += Smk[i]; // * photonSpec; //T! - change back to spec
-				if ((print_out) and (DEBUG_TAMAR)) {
-					cout << densityDerivative[i].toString() << endl;
-				}
+				densityDerivative[i] += Smk[i];
 			}
 
 			block->put(samplePos, spec, rRec.alpha);
-
-			if ((print_out) and (DEBUG_TAMAR)) {
-				cout << endl;
-				cout << "samplePos "<< j << " = (" << samplePos[0] << ", " << samplePos[1] << ")" << endl;
-				cout << "value "<< spec.toString() << endl;
-				cout << endl;
-			}
 			sampler->advance();
 		}
-		//	Spectrum tmp = Spectrum(sampler->getSampleCount());
+
 		for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-			densityDerivative[i] = densityDerivative[i] / Spectrum(sampler->getSampleCount());
+			densityDerivative[i] /= Spectrum(sampler->getSampleCount());
 		}
 
 		Scene *scene_notconst = const_cast<Scene*> (rRec.scene);
@@ -259,18 +223,6 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 		for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
 			scene_notconst->setTotalGradient(densityDerivative[i][0], index, i);
 		}
-
-//		bool output_to_file = 1;       //redirect densityDerivative to file
-//		if (output_to_file) {
-//			std::stringstream filename;
-//			filename << "output_" << offset[0] << "_" << offset[1] << ".txt";
-//			std::ofstream myfile;      //redirect densityDerivative to file
-//			myfile.open(filename.str().c_str());
-//			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-//				myfile << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl; //redirect densityDerivative to file
-//			}
-//			myfile.close(); //redirect densityDerivative to file
-//		}
 	}
 }
 

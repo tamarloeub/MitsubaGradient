@@ -357,7 +357,6 @@ public:
 		const Float stepSize = length/nSteps;
 		const Vector increment = ray.d * stepSize;
 
-//		bool DEBUG_TAMAR = 1;
 		bool DEBUG_TAMAR = print_out;
 		if ((DEBUG_TAMAR) and (print_out)) {
 			cout << endl;
@@ -401,11 +400,6 @@ public:
 			std::fill(inDev.begin(), inDev.end(), 0);
 			std::fill(inIndxs.begin(), inIndxs.end(), 0);
 			
-//			if (DEBUG_TAMAR){
-//				cout << "inner Dev struct:" << inDev.at(0) << endl;
-//				cout << "inner indxs struct:" << inIndxs.at(0) << endl;
-//			}
-
 			m_density->gridDerivative(p, inDev, inIndxs, print_out);
 
 			for(std::vector<int>::size_type j = 0; j != inDev.size(); j++) {
@@ -418,7 +412,7 @@ public:
 			if ((DEBUG_TAMAR) && (print_out)) {
 				cout << "p curr = " << p.toString() << " step = " << i << endl;
 				for(std::vector<int>::size_type j = 0; j != inDev.size(); j++) {
-					cout << "inDev.at(" << j << ") = " << inDev.at(j) << endl;
+					cout << "inDev.at(" << j << ") = " << inDev.at(j) << " at index " << inIndxs.at(j) << endl;
 				}
 				cout << endl;
 
@@ -428,18 +422,19 @@ public:
 			mRec.scoreIndxs.insert(mRec.scoreIndxs.end(), inIndxs.begin(), inIndxs.end());
 
 			Float densityAtT = lookupDensity(p, ray.d) * m_scale;
-			Float density_eps = 1 / 1000;
+			Float density_eps = 0.001;
 			Float factor;
 			Float density_factor;
 			if ( (i == nSteps) && (isDirectRay == false) ){ //&& (densityAtT > 0) ) {
 				// calculating :  inDev *= (1 / betaAtT -stepSize )
-//				std::transform( inDev.begin(), inDev.end(), inDev.begin(), std::bind1st(std::multiplies<float>(), ( 1 / densityAtT - stepSize )) );
-				density_factor = sqrt( pow(densityAtT, 2.0) + pow(density_eps, 2) );
-				factor = ( 1 / density_factor - stepSize );
-
+				if (densityAtT < 0.5) {
+					factor = 0;
+				} else {
+					density_factor = sqrt( pow(densityAtT, 2.0) + pow(density_eps, 2) );
+					factor = ( 1 / density_factor - stepSize );
+				}
 			} else {
 				// calculating :  inDev *= ( -stepSize );
-//				std::transform( inDev.begin(), inDev.end(), inDev.begin(), std::bind1st(std::multiplies<float>(), ( -stepSize )) );
 				factor = ( - stepSize );
 			}
 
@@ -450,18 +445,7 @@ public:
 				}
 				cout << endl;
 			}
-//			for(std::vector<int>::size_type j = 0; j != inDev.size(); j++) {
-//				if (std::isnan(inDev[j])){
-//					cout << "inDev[j] = " << inDev[j] << endl;
-//					cout << "factor = " << factor << endl;
-//					cout << "( -stepSize ) = " << ( -stepSize ) << endl;
-//					cout << "p: " << p.toString() << endl;
-//					cout << "ray.d: " << ray.d.toString() << endl;
-//					cout << "lookupDensity(p, ray.d) = "<< lookupDensity(p, ray.d) <<endl;
-//					cout << "( 1 / densityAtT - stepSize ) = " << ( 1 / (lookupDensity(p, ray.d) * m_scale) - stepSize ) << endl;
-//					cout << "length = " << length << endl;
-//				}
-//			}
+
 			mRec.scoreVals.insert(mRec.scoreVals.end(), inDev.begin(), inDev.end());
 			if ((DEBUG_TAMAR) && (print_out)) {
 				for(std::vector<int>::size_type j = 0; j != mRec.scoreVals.size(); j++) {
@@ -925,16 +909,6 @@ public:
 
 					derivateDensity(ray, mRec, false, print_out, 0.0); //18_3
 
-//					if ((DEBUG_TAMAR) and (print_out)) {
-//						cout << "sample dist:" << endl;
-//						cout << "point in space : (" << p[0] << ", " << p[1] << ", " << p[2] << ")" << endl;
-//						cout <<  "size of mRec.scoreVals = " << mRec.scoreVals.size() << endl;
-//						for(std::vector<int>::size_type i = 0; i != mRec.scoreVals.size(); i++) {
-//						    cout << "mRec.derivative[" << mRec.scoreIndxs[i] << "] = "
-//						    		<< mRec.scoreVals[i] << endl;
-//						}
-//					}
-
 					mRec.medium = this;
 					success = true;
 					break;
@@ -1007,6 +981,7 @@ protected:
 		}
 		return density;
 	}
+
 	//periodic
 	/* TODO: Move to Medium for homogeneous periodic */
 	bool getPeriodicRay(Ray &ray, Float t) const {
