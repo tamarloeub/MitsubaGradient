@@ -11,6 +11,7 @@ from struct import pack, unpack
 import re, time
 import scipy.io as sio
 import matplotlib.pyplot as plt
+from scipy.ndimage import zoom
 
 from mtspywrapper import *
 
@@ -146,7 +147,7 @@ x_spacing = 0.02 # in km
 y_spacing = 0.02 # in km
 z_spacing = 0.04 # in km
 
-beta_gt        = jpl_full_cloud[12:19, 14:21, 10:17] 
+beta_gt        = jpl_full_cloud[9:22, 11:24, 7:20] 
 
 # npad is a tuple of (n_before, n_after) for each dimension
 npad           = ((1, 1), (1, 1), (1, 1))
@@ -179,7 +180,7 @@ beta_gt_flat = beta_gt.flatten('F')
 
 
 # algorithm parameters
-max_iterations = 500 * 3 + 1 #500 *3
+max_iterations = 500 * 3*2 + 1 #500 *3
 max_val        = np.max(beta_gt_flat)
 grid_size      = np.prod(beta_gt.shape)
 
@@ -187,17 +188,11 @@ n_unknowns     = grid_size
 
 # sensors parameters
 n_sensors  = 9
-n_pixels_w = 8 #TBD
-n_pixels_h = 8 #TBD
+n_pixels_w = 15 #TBD
+n_pixels_h = 15 #TBD
 n_pixels   = n_pixels_h * n_pixels_w
 
 # optimizer parameters - ADAM
-# randomly select alpha and beta 1 hyperparameters
-#n_adam_hyp_params = 3
-#r      = np.random.uniform(-4, -1, n_adam_hyp_params) # -4 * np.random.rand(n_adam_hyp_params)
-#alphas = 10**r                                       # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; 
-                                                     #  alpha = 10**(r), then r is in [-a, 0] - randomly selected from a logaritmic scale 
-
 alpha   = 0.08 # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; alpha = 10**(r)                                - randomly selected from a logaritmic scale
 beta1   = 0.9  # randomly select beta1 hyperparameter -> sample (1-beta1), r = -a * np.random.uniform(-3, -1) ; beta1 = 1 - 10**(r) - randomly selected from a logaritmic scale
 epsilon = 1e-8
@@ -210,8 +205,6 @@ sensors_pos   = [ None ] * n_sensors # create an empty list
 algo_scene    = [ None ] * n_sensors # create an empty list
 I_algo        = np.zeros((n_sensors, len(beta0_diff), max_iterations, n_pixels_h, n_pixels_w))
 runtime       = np.zeros((len(beta0_diff), max_iterations))
-cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))
-betas         = np.zeros((len(beta0_diff), max_iterations, grid_size))
 cost          = np.zeros((len(beta0_diff), max_iterations))
 output_filename = 'renderedResult'
 
@@ -279,8 +272,8 @@ for ss in range(n_sensors):
     if render_gt_f:
         scene_gt[ss] = pyScene()
         scene_gt[ss].create_new_scene(beta=beta_gt, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
-                                 up=sensors_pos[ss]['up'], nSamples=Np_vector[0]*4*4, sensorType='perspective', bounding_box=bounds,
-                                 fov=fov_deg, width=n_pixels_w, height=n_pixels_h)
+                                      up=sensors_pos[ss]['up'], nSamples=Np_vector[0]*4*4, sensorType='perspective', bounding_box=bounds,
+                                      fov=fov_deg, width=n_pixels_w, height=n_pixels_h)
 
         I_gt[ss], _ = render_scene(scene_gt[ss]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
 
@@ -299,35 +292,155 @@ else:
 
 out_path  = '/home/tamarl/MitsubaGradient/Gradient wrapper/small cloud/jpl/'
 
-out_name  = 'source emitter radiance 100 small cloud jpl ' + str(grid_size) +' grid points ' + str(n_unknowns)
-out_name += ' unknowns ' + str(n_pixels) + ' pixels ' + str(n_sensors) + ' sensors all above the medium dependent grad and fwd Np '
-out_name +=  str(Np_vector[0]) + ' adam alpha ' + str(alpha) + ' mask photonSpec_F beta0 ' 
+out_name  = 'multiscale small cloud jpl ' + str(grid_size) + ' grid points ' + str(n_unknowns) + ' unknowns ' + str(n_pixels) 
+out_name += ' pixels ' + str(n_sensors) + ' sensors all above the medium dependent grad and fwd Np '+ str(Np_vector[0]) 
+out_name += ' adam alpha ' + str(alpha) + ' cloud No mask photonSpec_F beta0 ' 
+
+
+voxels_factor_ms = np.array([3., 1.5, 1.])
+n_stages = len(voxels_factor_ms)
+stage    = 0
+iters_stage = np.zeros(n_stages, dtype=int)
+ind0f_ms = [ None ] * n_stages
+ind0f_ms[-1] = ind0f
+
+for st in range(n_stages - 1):
+    if st == 0:
+        zoom_factor = 1./voxels_factor_ms[st] * np.ones(3)    
+    else:
+        zoom_factor = voxels_factor_ms[stage - 1] / voxels_factor_ms[stage] * np.ones(3)
+    beta_gt_ms   = zoom(beta_gt, zoom_factor)    
+    ind0f_ms[st] = np.where(beta_gt_ms.flatten('F') < 2)
 
 for bb in range(len(beta0_diff)):
-    
+
     # optimizer parameters - ADAM
     first_moment  = 0 #m0
     second_moment = 0 #v0
 
-    beta0 = np.ones(beta_gt.shape) * beta0_diff[bb]
+    beta0 = beta0_diff[bb] * np.ones(beta_gt.shape)
     beta0[ind0x, ind0y, ind0z] = beta_gt[ind0x, ind0y, ind0z]  
 
     # Gradient descent loop
     beta  = np.copy(beta0)
     start = time.time()
+    Np_factor_ms      = 8 * 2
+    cost_iter         = 0
+    multiscale_factor = 0
+    sat_factor        = 0.5
+    zoom_factor       = 1./voxels_factor_ms[stage] * np.ones(3)
+    ind0f = ind0f_ms[0]
+    beta  = zoom(beta, zoom_factor)
+
+    [nx_ms, ny_ms, nz_ms] = beta.shape
+    grid_size = nx_ms * ny_ms * nz_ms
+    betas         = np.zeros((len(beta0_diff), max_iterations, grid_size))
+    cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))    
+    betas_stage1_ms = 0
+    betas_stage2_ms = 0
+
+    cost_gradient_stage1_ms = 0
+    cost_gradient_stage2_ms = 0
 
     for iteration in range(max_iterations):               
         betas[bb, iteration] = beta.flatten('F')                
-        cost_grad            = np.zeros(grid_size)
+
+        # Multi scale in number of photons:
+        #if multiscale_factor >= 5:
+            #multiscale_factor = 0
+            #Np_factor_ms /= 2
+            #sat_factor /= 5.
+
+        # Multi scale in voxels:   
+        if (multiscale_factor >= 5) and (stage is not (n_stages - 1)):
+            #if voxels_factor_ms == 5.:
+                #voxels_factor_ms = 3.
+                #beta = zoom(beta, (5./voxels_factor_ms, 5./voxels_factor_ms, 5./voxels_factor_ms))
+                #[nx_ms, ny_ms, nz_ms] = beta.shape
+                #grid_size = nx_ms * ny_ms * nz_ms                
+                #betas_stage1_ms =  betas[:, 0:iteration]
+                #cost_gradient_stage1_ms = cost_gradient[0:iteration]
+                #stage1_iter = iteration
+                #betas         = np.zeros((len(beta0_diff), max_iterations-stage1_iter, grid_size))
+                #cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))                
+
+            #elif voxels_factor_ms == 3.:
+            if stage == 0:       
+                stage             += 1 
+                zoom_factor        = voxels_factor_ms[stage - 1] / voxels_factor_ms[stage] * np.ones(3)
+                multiscale_factor  = 0                
+                iters_stage[stage] = iteration                
+                ind0f              = ind0f_ms[stage - 1]
+                beta             = zoom(beta, zoom_factor, mode='nearest')                
+                beta_f   = beta.flatten('F')
+                beta_f[ind0f] = 0.01
+                beta = np.reshape(beta_f, beta.shape, 'F')
+                #beta[0,  :,  :] = 0.1
+                #beta[-1, :,  :] = 0.1
+                #beta[:,  0,  :] = 0.1
+                #beta[:, -1,  :] = 0.1
+                #beta[:,  :,  0] = 0.1
+                #beta[:,  :, -1] = 0.1
+
+                min1m = abs(first_moment).min()
+                first_moment  = zoom(first_moment, zoom_factor, mode='nearest')
+                first_moment[abs(first_moment) < min1m] = 0.0
+
+                min2m = second_moment.min()
+                second_moment = zoom(second_moment, zoom_factor, mode='nearest')                 
+                second_moment[second_moment < min2m] = 0.0
+
+                [ nx_ms, ny_ms, nz_ms ] = beta.shape
+                grid_size               = np.prod(beta.shape)
+
+                betas_stage1_ms =  betas[:, 0:iteration]
+                cost_gradient_stage1_ms = cost_gradient[0:iteration]                
+                betas         = np.zeros((len(beta0_diff), max_iterations - iters_stage[stage], grid_size))
+                cost_gradient = np.zeros((len(beta0_diff), max_iterations - iters_stage[stage], grid_size))   
+
+            elif stage == 1:
+                stage             += 1 
+                zoom_factor        = voxels_factor_ms[stage - 1] / voxels_factor_ms[stage] * np.ones(3)
+                multiscale_factor  = 0                
+                iters_stage[stage] = iteration  
+                ind0f              = ind0f_ms[stage - 1]
+
+                beta             = zoom(beta, zoom_factor, mode='nearest')
+                beta_f   = beta.flatten('F')
+                beta_f[ind0f] = 0.01
+                beta = np.reshape(beta_f, beta.shape, 'F')
+                #beta[0,  :,  :] = 0.1
+                #beta[-1, :,  :] = 0.1
+                #beta[:,  0,  :] = 0.1
+                #beta[:, -1,  :] = 0.1
+                #beta[:,  :,  0] = 0.1
+                #beta[:,  :, -1] = 0.1
+
+                min1m = abs(first_moment).min()                
+                first_moment  = zoom(first_moment, zoom_factor, mode='nearest')
+                first_moment[abs(first_moment) < min1m] = 0.0
+
+                min2m = second_moment.min()                
+                second_moment = zoom(second_moment, zoom_factor, mode='nearest')
+                second_moment[second_moment < min2m] = 0.0
+
+                [ nx_ms, ny_ms, nz_ms ] = beta.shape
+                grid_size               = np.prod(beta.shape)
+
+                betas_stage2_ms =  betas[:, 0:iteration - iters_stage[stage - 1]]
+                cost_gradient_stage2_ms = cost_gradient[0:iteration - iters_stage[stage - 1]]                
+                betas         = np.zeros((len(beta0_diff), max_iterations - iters_stage[stage], grid_size))
+                cost_gradient = np.zeros((len(beta0_diff), max_iterations - iters_stage[stage], grid_size))                 
+
+        cost_grad = np.zeros(grid_size)
 
         cost_iter = 0
         for ss in range(n_sensors):
             # Create scene with given beta
             algo_scene[ss] = pyScene()
-            algo_scene[ss].create_new_scene(beta=np.copy(beta), g=0.85, origin=sensors_pos[ss]['origin'], 
-                                            target=sensors_pos[ss]['target'], up=sensors_pos[ss]['up'], nSamples=Np_vector[0]/2/8, 
-                                            sensorType='perspective', fov=fov_deg, bounding_box=bounds, width=n_pixels_w, 
-                                            height=n_pixels_h)
+            algo_scene[ss].create_new_scene(beta=np.copy(beta), g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
+                                            up=sensors_pos[ss]['up'], nSamples=Np_vector[0] / Np_factor_ms, sensorType='perspective', fov=fov_deg,
+                                            bounding_box=bounds, width=n_pixels_w, height=n_pixels_h)
 
             [ I_algo[ss, bb, iteration], inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size,
                                                                      n_pixels_w, n_pixels_h)
@@ -338,9 +451,23 @@ for bb in range(len(beta0_diff)):
 
         cost[bb, iteration] = 0.5 * cost_iter
 		
+        # Multi scale:        
+        if iteration > 10*5:
+            if (abs(np.mean(cost[bb, iteration-10:iteration]) - np.mean(cost[bb, iteration-20:iteration-10])) < sat_factor):
+                multiscale_factor += 1
+            else:
+                multiscale_factor = 0
+
         cost_grad[ind0f]             = 0.0            
         cost_gradient[bb, iteration] = cost_grad
-        cost_grad_mat                = np.reshape(cost_grad, beta.shape, 'F')
+        cost_grad_mat    = np.reshape(cost_grad, [nx_ms, ny_ms, nz_ms], 'F')
+
+        #cost_grad_mat[0,  :,  :] = 0.0
+        #cost_grad_mat[-1, :,  :] = 0.0
+        #cost_grad_mat[:,  0,  :] = 0.0
+        #cost_grad_mat[:, -1,  :] = 0.0
+        #cost_grad_mat[:,  :,  0] = 0.0
+        #cost_grad_mat[:,  :, -1] = 0.0
 
         ## ADAM implementation
         first_moment  = beta1 * first_moment  + (1 - beta1) * cost_grad_mat
@@ -365,8 +492,12 @@ for bb in range(len(beta0_diff)):
                         { 'beta0_diff' : beta0_diff[bb], 'mask' : mask,                   # Scene pre-fixed params
                           'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,              # Optimization hyper-params
                           'first_moment' : first_moment, 'second_moment' : second_moment, # Optimization iters params
+                          'Np_factor_ms' : Np_factor_ms, 'voxels_factor_ms' : voxels_factor_ms, 'stage' : stage,
+                          'betas_stage1' : betas_stage1_ms, 'betas_stage2' : betas_stage2_ms, 'iters_stage' : iters_stage, 
+                          'cost_gradient_stage1' : cost_gradient_stage1_ms, 'cost_gradient_stage2' : cost_gradient_stage2_ms, 
+                                                                                          # Multiscale
                           'cost' : cost, 'I_algo': I_algo, 'betas' : betas, 'gradient' : cost_gradient, 'runtime' : runtime, 
-                          'iteration' : iteration})                                       # algorithm calculated variables
+                          'iteration' : iteration})                                       # algorithm calculated variables                  
 
             iters = np.linspace(1, iteration, iteration) 
             plt.figure(figsize=(19,9))    
@@ -389,15 +520,25 @@ for bb_p in range(len(beta0_diff)):
     gradient = cost_gradient[bb_p]
     #tmp      = np.ones(beta_gt_flat.shape)
     #tmp[beta_gt_flat >0] = beta_gt_flat[beta_gt_flat >0]    
-    tmp_p = np.reshape(betas_p[bb_p], [curr_iter, nx, ny, nz], 'F')
-    betas_err = (tmp_p - beta_gt) / beta_gt * 100
+    tmp_p = np.reshape(betas_p[bb_p], [curr_iter, nx_ms, ny_ms, nz_ms], 'F')
+    grid_f = np.power(betas_p[bb_p,curr_iter-1].shape[0], 1/3.) / nx
+    if abs(grid_f - 1) < 10e-10:
+        beta_gt_zoom = beta_gt
+    else:
+        beta_gt_zoom = zoom(beta, (grid_f, grid_f, grid_f))
+    [ind0x_ms, ind0y_ms, ind0z_ms]    = np.where(beta_gt_zoom < 2)    
+    betas_err = (tmp_p - beta_gt_zoom) / beta_gt_zoom * 100
     
     sio.savemat(out_path + out_name + str(beta0_diff[bb_p]) + '.mat', 
-                        { 'beta0_diff' : beta0_diff[bb_p], 'mask' : mask,                   # Scene pre-fixed params
-                          'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,              # Optimization hyper-params
-                          'first_moment' : first_moment, 'second_moment' : second_moment, # Optimization iters params
-                          'cost' : cost, 'I_algo': I_algo, 'betas' : betas, 'gradient' : cost_gradient, 'runtime' : runtime, 
-                          'iteration' : iteration})                                       # algorithm calculated variables
+                    { 'beta0_diff' : beta0_diff[bb_p], 'mask' : mask,                 # Scene pre-fixed params
+                      'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,              # Optimization hyper-params
+                      'first_moment' : first_moment, 'second_moment' : second_moment, # Optimization iters params
+                      'Np_factor_ms' : Np_factor_ms, 'voxels_factor_ms' : voxels_factor_ms, 'stage' : stage,
+                      'betas_stage1' : betas_stage1_ms, 'betas_stage2' : betas_stage2_ms, 'iters_stage' : iters_stage, 
+                      'cost_gradient_stage1' : cost_gradient_stage1_ms, 'cost_gradient_stage2' : cost_gradient_stage2_ms, 
+                                                                                      # Multiscale
+                      'cost' : cost, 'I_algo': I_algo, 'betas' : betas, 'gradient' : cost_gradient, 'runtime' : runtime, 
+                      'iteration' : iteration})                                       # algorithm calculated variables                                
 
     mean_betas_err = np.sum(np.sum(np.sum(abs((tmp_p - beta_gt)), 3), 2), 1) / np.sum(beta_gt.flatten('F'))*100
 
@@ -417,11 +558,11 @@ for bb_p in range(len(beta0_diff)):
     plt.savefig(out_path + out_name + ' cost.png', dpi=300)               
 
     plt.figure(figsize=(19,9))    
-    for yy in range(ny-2):                
+    for yy in range(ny_ms-2):                
         maxc = np.max([np.max(np.array([betas_err[0].flatten(), betas_err[t_2].flatten(), betas_err[-1].flatten()])), 100])
         minc = np.min([np.min(np.array([betas_err[0].flatten(), betas_err[t_2].flatten(), betas_err[-1].flatten()])), 0])        
 
-        plt.subplot(ny-2, 3, 3 * yy + 1)
+        plt.subplot(ny_ms-2, 3, 3 * yy + 1)
         plt.imshow(betas_err[ 0, :, yy+1, :])
         #plt.clim(minc, maxc)     
         plt.colorbar()        
@@ -429,7 +570,7 @@ for bb_p in range(len(beta0_diff)):
         non0_errs = np.mean(abs(betas_err[0, non0_x, yy + 1, non0_z].flatten()))
         plt.title('slice y = ' + str(yy + 2) + ' initial status, mean error = ' + str(round(non0_errs, 2)) + '%')
 
-        plt.subplot(ny-2, 3, 3 * yy + 2)
+        plt.subplot(ny_ms-2, 3, 3 * yy + 2)
         plt.imshow(betas_err[ t_2, :, yy+1, :])
         #plt.clim(minc, maxc)     
         plt.colorbar()
@@ -437,7 +578,7 @@ for bb_p in range(len(beta0_diff)):
         non0_errs = np.mean(abs(betas_err[t_2, non0_x, yy + 1, non0_z].flatten()))
         plt.title('iteration = ' + str(t_2) + ', mean error = ' + str(round(non0_errs, 2)) + '%')
 
-        plt.subplot(ny-2, 3, 3 * yy + 3)
+        plt.subplot(ny_ms-2, 3, 3 * yy + 3)
         plt.imshow(betas_err[ -1, :, yy+1, :])
         #plt.clim(minc, maxc)     
         plt.colorbar()
@@ -449,26 +590,26 @@ for bb_p in range(len(beta0_diff)):
     plt.savefig(out_path + out_name + ' errors heat maps.png', dpi=300)               
 
     plt.figure(figsize=(19,9))    
-    for yy in range(ny-2):               
-        plt.subplot(ny-2, 4, 4 * yy + 1)
-        plt.imshow(beta_gt[ :, yy+1, :])
+    for yy in range(ny_ms-2):                
+        plt.subplot(ny_ms-2, 4, 4 * yy + 1)
+        plt.imshow(beta_gt_zoom[ :, yy+1, :])
         plt.colorbar()
         plt.axis('off')
         plt.title('Original Beta, slice y = ' + str(yy + 2))
 
-        plt.subplot(ny - 2, 4, 4 * yy + 2)
+        plt.subplot(ny_ms-2, 4, 4 * yy + 2)
         plt.imshow(tmp_p[ 0, :, yy+1, :])
         plt.colorbar()        
         plt.axis('off')
         plt.title('Initial status')
 
-        plt.subplot(ny-2, 4, 4 * yy + 3)
+        plt.subplot(ny_ms-2, 4, 4 * yy + 3)
         plt.imshow(tmp_p[ t_2, :, yy+1, :])
         plt.colorbar()
         plt.axis('off')
         plt.title('iteration = ' + str(t_2))
 
-        plt.subplot(ny - 2, 4, 4 * yy + 4)
+        plt.subplot(ny_ms-2, 4, 4 * yy + 4)
         plt.imshow(tmp_p[ -1, :, yy + 1, :])
         #plt.clim(minc, maxc)     
         plt.colorbar()

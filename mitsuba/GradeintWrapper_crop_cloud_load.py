@@ -146,7 +146,7 @@ x_spacing = 0.02 # in km
 y_spacing = 0.02 # in km
 z_spacing = 0.04 # in km
 
-beta_gt        = jpl_full_cloud[12:19, 14:21, 10:17] 
+beta_gt        = jpl_full_cloud[9:22, 11:24, 7:20] 
 
 # npad is a tuple of (n_before, n_after) for each dimension
 npad           = ((1, 1), (1, 1), (1, 1))
@@ -179,7 +179,7 @@ beta_gt_flat = beta_gt.flatten('F')
 
 
 # algorithm parameters
-max_iterations = 500 * 3 + 1 #500 *3
+max_iterations = 500 * 3*2 *2+ 1 #500 *3
 max_val        = np.max(beta_gt_flat)
 grid_size      = np.prod(beta_gt.shape)
 
@@ -187,18 +187,12 @@ n_unknowns     = grid_size
 
 # sensors parameters
 n_sensors  = 9
-n_pixels_w = 8 #TBD
-n_pixels_h = 8 #TBD
+n_pixels_w = 15 #TBD
+n_pixels_h = 15 #TBD
 n_pixels   = n_pixels_h * n_pixels_w
 
 # optimizer parameters - ADAM
-# randomly select alpha and beta 1 hyperparameters
-#n_adam_hyp_params = 3
-#r      = np.random.uniform(-4, -1, n_adam_hyp_params) # -4 * np.random.rand(n_adam_hyp_params)
-#alphas = 10**r                                       # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; 
-                                                     #  alpha = 10**(r), then r is in [-a, 0] - randomly selected from a logaritmic scale 
-
-alpha   = 0.08 # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; alpha = 10**(r)                                - randomly selected from a logaritmic scale
+alpha   = 0.01 # randomly select alpha hyperparameter -> r = -a * np.random.rand() ; alpha = 10**(r)                                - randomly selected from a logaritmic scale
 beta1   = 0.9  # randomly select beta1 hyperparameter -> sample (1-beta1), r = -a * np.random.uniform(-3, -1) ; beta1 = 1 - 10**(r) - randomly selected from a logaritmic scale
 epsilon = 1e-8
 beta2   = 0.999
@@ -304,19 +298,40 @@ out_name += ' unknowns ' + str(n_pixels) + ' pixels ' + str(n_sensors) + ' senso
 out_name +=  str(Np_vector[0]) + ' adam alpha ' + str(alpha) + ' mask photonSpec_F beta0 ' 
 
 for bb in range(len(beta0_diff)):
-    
-    # optimizer parameters - ADAM
-    first_moment  = 0 #m0
-    second_moment = 0 #v0
 
     beta0 = np.ones(beta_gt.shape) * beta0_diff[bb]
-    beta0[ind0x, ind0y, ind0z] = beta_gt[ind0x, ind0y, ind0z]  
-
+    beta0[ind0x, ind0y, ind0z] = beta_gt[ind0x, ind0y, ind0z]          
+    
+    # load results 
+    out_name_load = "/home/tamarl/MitsubaGradient/Gradient wrapper/small cloud/jpl/" ##!
+    load_res  = sio.loadmat(out_name_load)
+    
+    # algo params
+    prev_iter = load_res['iteration'][0,0] + 1     
+    
+    # ADAM params
+    alpha = load_res['alpha']
+    beta1 = load_res['beta1']
+    beta2 = load_res['beta2']
+    first_moment      = load_res['first_moment']
+    second_moment     = load_res['second_moment']
+    #first_moment_bar  = load_res['first_moment_bar']
+    #second_moment_bar = load_res['second_moment_bar']
+    
+    # scene params
+    runtime[:, 0:prev_iter]       = load_res['runtime']
+    cost[: ,0:prev_iter]          = load_res['cost']
+    I_algo[:, :, 0:prev_iter]     = load_res['I_algo']
+    betas[:, 0:prev_iter]         = load_res['betas']
+    cost_gradient[:, 0:prev_iter] = load_res['gradient']
+    
     # Gradient descent loop
-    beta  = np.copy(beta0)
+    beta_prev = np.reshape(betas[:,prev_iter-1], beta_gt.shape, 'F')
+    beta  = np.copy(beta_prev)
     start = time.time()
 
-    for iteration in range(max_iterations):               
+    for ii in range(max_iterations - prev_iter): 
+        iteration = ii + prev_iter
         betas[bb, iteration] = beta.flatten('F')                
         cost_grad            = np.zeros(grid_size)
 
@@ -360,14 +375,14 @@ for bb in range(len(beta0_diff)):
 
         runtime[bb, iteration] = end - start 
         if (np.mod(iteration, 100) == 0):
-            bb0 = beta0_diff[bb]          
+            bb0 = beta0_diff[bb]                            
             sio.savemat(out_path + out_name + str(beta0_diff[bb]) + '.mat', 
                         { 'beta0_diff' : beta0_diff[bb], 'mask' : mask,                   # Scene pre-fixed params
                           'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,              # Optimization hyper-params
                           'first_moment' : first_moment, 'second_moment' : second_moment, # Optimization iters params
                           'cost' : cost, 'I_algo': I_algo, 'betas' : betas, 'gradient' : cost_gradient, 'runtime' : runtime, 
                           'iteration' : iteration})                                       # algorithm calculated variables
-
+            
             iters = np.linspace(1, iteration, iteration) 
             plt.figure(figsize=(19,9))    
             plt.plot(iters, cost[bb,0:iteration], '--',  marker='o', markersize=5)
@@ -398,9 +413,9 @@ for bb_p in range(len(beta0_diff)):
                           'first_moment' : first_moment, 'second_moment' : second_moment, # Optimization iters params
                           'cost' : cost, 'I_algo': I_algo, 'betas' : betas, 'gradient' : cost_gradient, 'runtime' : runtime, 
                           'iteration' : iteration})                                       # algorithm calculated variables
-
+    
     mean_betas_err = np.sum(np.sum(np.sum(abs((tmp_p - beta_gt)), 3), 2), 1) / np.sum(beta_gt.flatten('F'))*100
-
+    
     plt.figure(figsize=(19,9))    
     plt.plot(iters, mean_betas_err, '--',  marker='o', markersize=5)
     plt.title('mean error of beta in %', fontweight='bold')  
