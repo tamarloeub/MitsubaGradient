@@ -6,7 +6,32 @@ from mtspywrapper import *
 import xml.etree.ElementTree as ET
 from xml.dom.minidom import parseString 
 
-
+class Ocean(object):
+    def __init__(self):
+        self._shape   = None
+        self._diffuse = None
+        self._transz  = None
+        self._scalexy = None
+        
+    def set_diffuse(self, val):
+        self._diffuse = val
+    
+    def set_transz(self, val):
+        self._transz = val
+    
+    def set_scalexy(self, val):
+        self._scalexy = float(val)
+        
+    def get_diffuse(self):
+        return self._diffuse
+    
+    def get_transz(self):
+        return self._transz
+    
+    def get_scalexy(self):
+        return self._scalexy
+        
+        
 class pyScene(object):
     def __init__(self):
         self._scene  = Scene()         
@@ -17,7 +42,7 @@ class pyScene(object):
         self._scene_set      = False        
         self._integrator_str = None
         self._emitter_str    = None
-        self._ocean          = None
+        self._ocean          = Ocean()
 
     def get_scene_beta(self):
         if self._medium == None:
@@ -68,14 +93,20 @@ class pyScene(object):
     def set_ocean(self):
         zmin = self._medium._bounding_box[2]
         zmax = self._medium._bounding_box[-1]
-        tz   = (zmax - zmin)
-        self._ocean = self._pmgr.create({
+        #tz   = (zmax - zmin)
+        tz   = 1
+        self._ocean.set_diffuse(Spectrum(0.01))
+        self._ocean.set_transz(-tz)
+        self._ocean.set_scalexy(100)
+        
+        scalexy = self._ocean.get_scalexy()
+        self._ocean._shape = self._pmgr.create({
             'type' : 'rectangle',
             'bsdf' : {
                     'type' : 'diffuse',
-                    'reflectance' : Spectrum(0.05)
+                    'reflectance' : self._ocean.get_diffuse()
             },
-            'toWorld' : Transform.translate(Vector(0, 0, -tz)).scale(Vector(1., 1.,20.))
+            'toWorld' : Transform.translate(Vector(0, 0, -tz)).scale(Vector(scalexy, scalexy, 1.))#Vector(1., 1.,20.))
         }) 
    
     def set_emitter(self):
@@ -83,6 +114,7 @@ class pyScene(object):
         self._emitter_str = self._pmgr.create({
             'type' : 'directional',
             'direction' : Vector(0, 0, -1),
+            #'toWorld' :  Transform.rotate(Vector(0,0,1), 180),            
             'irradiance' : Spectrum(100)
         })
 
@@ -155,7 +187,7 @@ class pyScene(object):
         self._scene.addChild(self._medium.medium_to_mitsuba(scene_type))  
         
         # Set ocean
-        self._scene.addChild(self._ocean)        
+        self._scene.addChild(self._ocean._shape)        
 
         self._scene.configure()        
 
@@ -228,9 +260,9 @@ class pyScene(object):
         return dictionary
     
     def ocean_to_dict(self):
-        zmin = self._medium._bounding_box[2]
-        zmax = self._medium._bounding_box[-1]
-        tz   = (zmax - zmin)
+        #zmin = self._medium._bounding_box[2]
+        #zmax = self._medium._bounding_box[-1]
+        #tz   = (zmax - zmin)
         
         dictionary = {
             'type' : 'rectangle',
@@ -238,16 +270,17 @@ class pyScene(object):
                 'type'  : 'diffuse',                
                 'spectrum' : {
                     'name' : 'reflectance',
-                    'value' : '0.05'
+                    'value' : str(self._ocean.get_diffuse()[0]) #'0.05'
                 },
             },
             'transform' : {
                 'name' : 'toWorld',
                 'scale' : {
-                    'value' : '20'
+                    'x' : str(self._ocean.get_scalexy()),
+                    'y' : str(self._ocean.get_scalexy())
                 },
                 'translate' : {
-                    'z' : '-' + str(tz)
+                    'z' : str(self._ocean.get_transz())
                 }
             } 
         }
@@ -267,16 +300,33 @@ class pyScene(object):
         dictionary = {
             'version'    : '0.5.0',
             'medium'     : self._medium.to_dict(),
+            #'shape'      : self._medium.bounding_to_dict(),
             ('shape', 0) : self._medium.bounding_to_dict(),
             'sensor'     : self._sensor.to_dict(),
             'emitter'    : self.emitter_to_dict(),
-            'integrator' : self.integrator_to_dict(),                                
+            'integrator' : self.integrator_to_dict(),
             ('shape', 1) : self.ocean_to_dict()
         }
         return dictionary
 
     def xml_rec(self, elem, dictionary):
+        # first export medium to xml:
+        if 'medium' in dictionary.keys():
+            if type(dictionary['medium']) == dict:
+                sub_elem = ET.SubElement(elem,'medium')
+                sub_elem = self.xml_rec(sub_elem,dictionary['medium'])
+            else:
+                if type(dictionary['medium']) != str:
+                    value = str(dictionary['medium'])
+                else:
+                    value = dictionary['medium']
+                elem.set('medium', value)            
+
+        # export the rest of the dict to xml:
         for atr in dictionary.keys():
+            if atr == 'medium':
+                continue
+            
             if type(atr) == tuple:
                 atr_temp = atr[0]
             else:

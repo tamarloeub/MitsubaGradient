@@ -92,8 +92,8 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixel
     size   = film.getSize() 
     bitmap = Bitmap(Bitmap.ELuminance, Bitmap.EFloat32, size) # for radiance
     #bitmap = Bitmap(Bitmap.ERGB, Bitmap.EUInt8, size) # for RGB image
-    blocksize = max(np.divide(max(size.x, size.y), n_cores), 1)
-    scene.setBlockSize(blocksize) 
+    #blocksize = max(np.divide(max(size.x, size.y), n_cores), 1)
+    #scene.setBlockSize(blocksize) 
 
     scene.setDestinationFile(output_filename)    
 
@@ -123,7 +123,6 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixel
     return radiance, inner_grad
 
 
-
 ## Parameters
 # load density from vol file
 
@@ -137,8 +136,9 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixel
 #bounds  = [-nx * x_spacing / 2, -ny * y_spacing / 2, 0, nx * x_spacing / 2, ny * y_spacing / 2, nz * z_spacing]#-250, -250, 0, 250, 250, 80]   # bounding box = [xmin, ymin, zmin, xmax, ymax, zmax] in meters units 
 
 ## flags
-render_gt_f = False
+render_gt_f = True
 f_multi     = True
+crop_f      = True
 
 ## load jpl's cloud
 jpl_full_cloud = np.load('CloudsSim/jpl/jpl_ext.npy')
@@ -146,49 +146,62 @@ x_spacing = 0.02 # in km
 y_spacing = 0.02 # in km
 z_spacing = 0.04 # in km
 
-beta_gt        = jpl_full_cloud[12:19, 14:21, 10:17] 
-
 # npad is a tuple of (n_before, n_after) for each dimension
 npad           = ((1, 1), (1, 1), (1, 1))
-beta_gt        = np.pad(beta_gt, pad_width=npad, mode='constant', constant_values=0)
-[ nx, ny, nz ] = beta_gt.shape
+jpl_full_cloud = np.pad(jpl_full_cloud, pad_width=npad, mode='constant', constant_values=0)
+[ nx, ny, nz ] = jpl_full_cloud.shape
 
 # manually creates mask
-ind0x, ind0y, ind0z    = np.where(beta_gt < 2)
-non0_x, non0_y, non0_z = np.where(beta_gt >= 2)
-ind0f  = np.where(beta_gt.flatten('F') < 2)
-non0_f = np.where(beta_gt.flatten('F') >= 2)
+ind0x, ind0y, ind0z    = np.where(jpl_full_cloud < 2)
+non0_x, non0_y, non0_z = np.where(jpl_full_cloud >= 2)
+ind0f  = np.where(jpl_full_cloud.flatten('F') < 2)
+non0_f = np.where(jpl_full_cloud.flatten('F') >= 2)
 
-# bounding box = [xmin, ymin, zmin, xmax, ymax, zmax] in km units 
-bounds = [-nx * x_spacing / 2, -ny * y_spacing / 2, 0, nx * x_spacing / 2, ny * y_spacing / 2, nz * z_spacing]
+jpl_full_cloud[ind0x, ind0y, ind0z] = 0.01
 
-norm_factor  = sum(beta_gt * z_spacing, 2) / 5.
-beta_gt     /= np.mean(norm_factor)
-
-beta_gt[ind0x, ind0y, ind0z] = 0.01
-
-beta_gt_flat = beta_gt.flatten('F')
+#norm_factor  = sum(beta_gt * z_spacing, 2) / 5.
+#beta_gt     /= np.mean(norm_factor)
 
 # Update Mask to space curving mask
-# mask = sio.loadmat('mask for cloud 14x14x14 zero padded one voxel each axis.mat')
-# mask = mask['mask']
-# ind0x, ind0y, ind0z    = np.where(mask == 0)
-# non0_x, non0_y, non0_z = np.where(mask == 1)
-# ind0f  = np.where(mask.flatten('F') == 0)
-# non0_f = np.where(mask.flatten('F') == 1)
+n_sensors  = 9
+# mask resolution
+mask_p     = np.power(np.max([nx, ny]) * 2, 2)
+mask_name  = 'mask original jpl with air ' + str(np.prod(jpl_full_cloud.shape)) + ' grid points ' + str(n_sensors) + ' sensors above the '
+mask_name += 'medium 1 cycle ' + str(mask_p) + ' pixels.mat'
+mask       = sio.loadmat(mask_name)
+load_mask  = mask['mask']
 
+# crop cloud 
+if crop_f:
+    beta_gt = np.pad(jpl_full_cloud[12:19, 14:21, 10:17], pad_width=npad, mode='constant', constant_values=0)
+    mask    = np.pad(load_mask[12:19, 14:21, 10:17],      pad_width=npad, mode='constant', constant_values=0)
+    [ nx, ny, nz ] = beta_gt.shape    
+    
+else:
+    beta_gt = jpl_full_cloud
+    mask    = load_mask
+
+# bounding box = [xmin, ymin, zmin, xmax, ymax, zmax] in km units 
+bounds = [0, 0, 0, nx * x_spacing, ny * y_spacing, nz * z_spacing]#[-nx * x_spacing / 2, -ny * y_spacing / 2, 0, nx * x_spacing / 2, ny * y_spacing / 2, nz * z_spacing]
+
+ind0x, ind0y, ind0z    = np.where(mask == 0)
+non0_x, non0_y, non0_z = np.where(mask > 0)
+ind0f  = np.where(mask.flatten('F') == 0)
+non0_f = np.where(mask.flatten('F') > 0)
+
+beta_gt[ind0x, ind0y, ind0z] = 0.01
+beta_gt_flat = beta_gt.flatten('F')
 
 # algorithm parameters
-max_iterations = 500 * 3 + 1 #500 *3
+max_iterations = 500 * 3 * 4 + 1 #500 *3
 max_val        = np.max(beta_gt_flat)
 grid_size      = np.prod(beta_gt.shape)
 
 n_unknowns     = grid_size
 
 # sensors parameters
-n_sensors  = 9
-n_pixels_w = 8 #TBD
-n_pixels_h = 8 #TBD
+n_pixels_w = np.max([nx, ny]) * 2 # resolution ~= spacing / 2 = 10 meters
+n_pixels_h = np.max([nx, ny]) * 2
 n_pixels   = n_pixels_h * n_pixels_w
 
 # optimizer parameters - ADAM
@@ -203,7 +216,8 @@ beta1   = 0.9  # randomly select beta1 hyperparameter -> sample (1-beta1), r = -
 epsilon = 1e-8
 beta2   = 0.999
 
-Np_vector  = np.array([512]) * 128#np.array([8192 / 4])
+Np_vector  = np.array([512]) / 2 #np.array([8192 / 4])
+gt_Np_fac  = 4
 beta0_diff = np.array([50])
 
 sensors_pos   = [ None ] * n_sensors # create an empty list
@@ -213,6 +227,7 @@ runtime       = np.zeros((len(beta0_diff), max_iterations))
 cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))
 betas         = np.zeros((len(beta0_diff), max_iterations, grid_size))
 cost          = np.zeros((len(beta0_diff), max_iterations))
+
 output_filename = 'renderedResult'
 
 if f_multi: # Set parallel job or run on 1 cpu only
@@ -228,17 +243,16 @@ scheduler.start()
 
 #scenes params
 TOA      = bounds[5]
-H        = z_spacing * 1.5
-t_const  = np.array([0, 0, TOA])
+H        = z_spacing * nz / 4.
+t_const  = np.array([bounds[3] / 2., bounds[4] / 2., TOA])
 up_const = np.array([-1, 0, 0])
-sensors_radius = x_spacing * (nx + 3) / 2  # angles to medium = 51 deg
 
 # Ground Truth:
 o = np.zeros((n_sensors, 3))
 t = np.zeros((n_sensors, 3))
 u = np.zeros((n_sensors, 3))
 
-o[0] = np.array([0, 0, TOA + H]) 
+o[0] = np.array([round(bounds[3], 1) / 2., round(bounds[3], 1) / 2., TOA + H]) 
 t[0] = t_const
 u[0] = up_const
 
@@ -249,24 +263,26 @@ min_medium    = np.array([bounds[0], bounds[1], bounds[2]])
 medium_center = ( max_medium + min_medium ) / 2
 
 L       = np.max([max_medium[0] - min_medium[0], max_medium[1] - min_medium[1]]) / 2 #camera's FOV covers the whole medium
-fov_rad = 2 * np.arctan(L / np.linalg.norm(o[0] - t[0]) )
+fov_rad = 2 * np.arctan(L / ((TOA + H) / 4) )
 fov_deg = 180 * fov_rad / np.pi
 
-for ss in range((n_sensors - 1)/2):
-    theta     = 2 * np.pi / (n_sensors - 1) * ss
-    o[ss + 1] = np.array([round(sensors_radius * np.cos(theta), 2), round(sensors_radius * np.sin(theta), 2), TOA + H])     
-    t[ss + 1] = t_const
-    u[ss + 1] = up_const
+for rr in range(1):#2):
+    #if rr == 0:
+    #    sensors_radius = y_spacing * (ny + 1) / 2  # angles to medium = 51 deg
+    #else:
+    sensors_radius = y_spacing * (ny + 12) / 2
+        
+    for ss in range(n_sensors-1):#(n_sensors - 1)/2):
+        theta     = 2 * np.pi / (n_sensors - 1) * ss
+        o[ss + 1 + rr*4] = np.array([round(o[0][0] + sensors_radius * np.cos(theta), 2), 
+                                     round(o[0][1] + sensors_radius * np.sin(theta), 2), TOA + H])     
+        t[ss + 1 + rr*4] = t_const
+        u[ss + 1 + rr*4] = up_const
 
-sensors_radius = x_spacing * (nx + 1) / 2
+gt_out  = 'ground truth original jpl cloud with air and ocean ' + str(grid_size) + ' grid points ' + str(n_sensors) + ' sensors all above the '
+gt_out += 'medium 1 cycle ' + str(n_pixels) + ' pixels ' + str(Np_vector[0] * gt_Np_fac) + ' photons.mat'
 
-for ss in range((n_sensors - 1) / 2):
-    theta     = 2 * np.pi / (n_sensors - 1) * ss
-    o[ss + 5] = np.array([round(sensors_radius * np.cos(theta), 2), round(sensors_radius * np.sin(theta), 2), TOA + H])     
-    t[ss + 5] = t_const
-    u[ss + 5] = up_const
-
-if render_gt_f:
+if (not os.path.isfile(gt_out)) or render_gt_f:
     scene_gt = [ None ] * n_sensors # create an empty list
     I_gt     = np.zeros((n_sensors, n_pixels_h, n_pixels_w))
 
@@ -276,10 +292,10 @@ for ss in range(n_sensors):
                         'target' : Point(t[ss][0],   t[ss][1],   t[ss][2]), 
                         'up'     : Vector(newUp[0],  newUp[1],   newUp[2]) }
 
-    if render_gt_f:
+    if (not os.path.isfile(gt_out)) or render_gt_f:
         scene_gt[ss] = pyScene()
         scene_gt[ss].create_new_scene(beta=beta_gt, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
-                                 up=sensors_pos[ss]['up'], nSamples=Np_vector[0]*4*4, sensorType='perspective', bounding_box=bounds,
+                                 up=sensors_pos[ss]['up'], nSamples=Np_vector[0]*gt_Np_fac, sensorType='perspective', bounding_box=bounds,
                                  fov=fov_deg, width=n_pixels_w, height=n_pixels_h)
 
         I_gt[ss], _ = render_scene(scene_gt[ss]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
@@ -287,21 +303,22 @@ for ss in range(n_sensors):
     ##scene        = sceneLoadFromFile(os.path.realpath(scene_gt[ss]._medium._medium_path) + '/scene.xml')
     ##I_gt[ss], gt_grad[ss] = render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
 
-gt_out  = 'source emitter radiance 100 crop cloud jpl ground truth ' + str(grid_size) + ' grid points ' + str(n_unknowns) + ' unknowns ' 
-gt_out += str(n_sensors) + ' sensors all above the medium ' + str(n_pixels) + ' pixels ' + str(Np_vector[0]*4*4) +' photons.mat'
-
-if render_gt_f:
+if (not os.path.isfile(gt_out)) or render_gt_f:
     sio.savemat(gt_out, {'beta_gt': beta_gt, 'I_gt': I_gt, 'scene_gt': scene_gt})
 
 else:
     gt = sio.loadmat(gt_out)
     I_gt = gt['I_gt']
 
-out_path  = '/home/tamarl/MitsubaGradient/Gradient wrapper/small cloud/jpl/'
-
-out_name  = 'source emitter radiance 100 small cloud jpl ' + str(grid_size) +' grid points ' + str(n_unknowns)
-out_name += ' unknowns ' + str(n_pixels) + ' pixels ' + str(n_sensors) + ' sensors all above the medium dependent grad and fwd Np '
-out_name +=  str(Np_vector[0]) + ' adam alpha ' + str(alpha) + ' mask photonSpec_F beta0 ' 
+out_path  = '/home/tamarl/MitsubaGradient/Gradient wrapper/jpl/'
+if crop_f:
+    out_name = 'crop '
+else:
+    out_name = ''
+    
+out_name += 'org jpl cloud with air and ocean ' + str(grid_size) + ' grid points ' + str(n_unknowns) + ' unknowns ' + str(n_sensors) + ' sensors all '
+out_name += 'above the medium 1 cycle ' + str(n_pixels) + ' pixels ' + str(Np_vector[0]) + ' photons ' + str(alpha) + ' adam alpha with space '
+out_name += 'carving mask fix air'
 
 for bb in range(len(beta0_diff)):
     
@@ -325,13 +342,17 @@ for bb in range(len(beta0_diff)):
             # Create scene with given beta
             algo_scene[ss] = pyScene()
             algo_scene[ss].create_new_scene(beta=np.copy(beta), g=0.85, origin=sensors_pos[ss]['origin'], 
-                                            target=sensors_pos[ss]['target'], up=sensors_pos[ss]['up'], nSamples=Np_vector[0]/2/8, 
+                                            target=sensors_pos[ss]['target'], up=sensors_pos[ss]['up'], nSamples=Np_vector[0], 
                                             sensorType='perspective', fov=fov_deg, bounding_box=bounds, width=n_pixels_w, 
                                             height=n_pixels_h)
 
             [ I_algo[ss, bb, iteration], inner_grad ] = render_scene(algo_scene[ss]._scene, output_filename, n_cores, grid_size,
                                                                      n_pixels_w, n_pixels_h)
-            
+            # remove the scene's dir
+            import shutil
+            if os.path.exists(os.path.realpath(algo_scene[ss]._medium._medium_path)):
+                shutil.rmtree(os.path.realpath(algo_scene[ss]._medium._medium_path))
+            #
             tmp        =  (-1) * ( I_algo[ss, bb, iteration] - I_gt[ss] )                    
             cost_grad += np.dot(inner_grad, tmp.flatten('F'))
             cost_iter += np.linalg.norm(tmp,ord=2)				
@@ -359,9 +380,9 @@ for bb in range(len(beta0_diff)):
         end = time.time()
 
         runtime[bb, iteration] = end - start 
-        if (np.mod(iteration, 100) == 0):
+        if (np.mod(iteration, 500) == 0):
             bb0 = beta0_diff[bb]          
-            sio.savemat(out_path + out_name + str(beta0_diff[bb]) + '.mat', 
+            sio.savemat(out_path + out_name + ' iter ' + str(iteration) + '.mat', 
                         { 'beta0_diff' : beta0_diff[bb], 'mask' : mask,                   # Scene pre-fixed params
                           'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,              # Optimization hyper-params
                           'first_moment' : first_moment, 'second_moment' : second_moment, # Optimization iters params
@@ -374,7 +395,7 @@ for bb in range(len(beta0_diff)):
             plt.title('Cost', fontweight='bold')  
             plt.grid(True)
             plt.xlim(left=0)
-            plt.savefig(out_path + out_name + 'iter ' + str(iteration) + ' cost.png', dpi=300)                
+            plt.savefig(out_path + out_name + ' iter ' + str(iteration) + ' cost.png', dpi=300)                
 
 curr_iter = iteration
 I_algo_p  = I_algo[:, :, 0:curr_iter]
@@ -392,7 +413,7 @@ for bb_p in range(len(beta0_diff)):
     tmp_p = np.reshape(betas_p[bb_p], [curr_iter, nx, ny, nz], 'F')
     betas_err = (tmp_p - beta_gt) / beta_gt * 100
     
-    sio.savemat(out_path + out_name + str(beta0_diff[bb_p]) + '.mat', 
+    sio.savemat(out_path + out_name + '.mat', 
                         { 'beta0_diff' : beta0_diff[bb_p], 'mask' : mask,                   # Scene pre-fixed params
                           'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,              # Optimization hyper-params
                           'first_moment' : first_moment, 'second_moment' : second_moment, # Optimization iters params

@@ -286,7 +286,7 @@ public:
 						/* Prevent light leaks due to the use of shading normals */
 						if (!m_strictNormals ||
 							woDotGeoN * Frame::cosTheta(bRec.wo) > 0) {
-							cout << "else, BSDF m_strictNormals is zero = " << m_strictNormals << " and woDotGeoN * Frame::cosTheta(bRec.wo) > 0" << endl;
+							//cout << "else, BSDF m_strictNormals is zero = " << m_strictNormals << " and woDotGeoN * Frame::cosTheta(bRec.wo) > 0" << endl;
 							Li += throughput * value * bsdf->eval(bRec);
 						}
 					}
@@ -302,9 +302,9 @@ public:
 				if (bsdfVal.isZero()){
 					break;
 				}
-				if ((bsdfVal[0] != 1.0) && (bsdfVal[1] != 1.0) && (bsdfVal[2] != 1.0)){
-					cout << "bsdfVal = " << bsdfVal.toString() << endl;
-				}
+				//if ((bsdfVal[0] != 1.0) && (bsdfVal[1] != 1.0) && (bsdfVal[2] != 1.0)){
+					//cout << "bsdfVal = " << bsdfVal.toString() << endl;
+				//}
 				/* Recursively gather indirect illumination? */
 				int recursiveType = 0;
 				if ((rRec.depth + 1 < m_maxDepth || m_maxDepth < 0) &&
