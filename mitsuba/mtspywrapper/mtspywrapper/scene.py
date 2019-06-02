@@ -91,12 +91,12 @@ class pyScene(object):
         })
     
     def set_ocean(self):
-        zmin = self._medium._bounding_box[2]
-        zmax = self._medium._bounding_box[-1]
-        #tz   = (zmax - zmin)
-        tz   = 1
+        #zmin = self._medium._bounding_box[2]
+        #zmax = self._medium._bounding_box[-1]
+        ##tz   = (zmax - zmin)
+        tz   = 0
         self._ocean.set_diffuse(Spectrum(0.01))
-        self._ocean.set_transz(-tz)
+        #self._ocean.set_transz(-tz)
         self._ocean.set_scalexy(100)
         
         scalexy = self._ocean.get_scalexy()
@@ -259,11 +259,7 @@ class pyScene(object):
         }
         return dictionary
     
-    def ocean_to_dict(self):
-        #zmin = self._medium._bounding_box[2]
-        #zmax = self._medium._bounding_box[-1]
-        #tz   = (zmax - zmin)
-        
+    def ocean_to_dict(self):      
         dictionary = {
             'type' : 'rectangle',
             'bsdf' : {
@@ -272,18 +268,37 @@ class pyScene(object):
                     'name' : 'reflectance',
                     'value' : str(self._ocean.get_diffuse()[0]) #'0.05'
                 },
-            },
-            'transform' : {
+            } }
+        
+        if self._ocean.get_scalexy() is not None:
+            if self._ocean.get_transz() is not None:
+                dictionary.update({'transform' : {
+                    'name' : 'toWorld',
+                    'scale' : {
+                        'x' : str(self._ocean.get_scalexy()),
+                        'y' : str(self._ocean.get_scalexy())
+                    },
+                    'translate' : {
+                        'z' : str(self._ocean.get_transz())
+                    }
+                } }) 
+            else:
+                dictionary.update({'transform' : {
+                    'name' : 'toWorld',
+                    'scale' : {
+                        'x' : str(self._ocean.get_scalexy()),
+                        'y' : str(self._ocean.get_scalexy())
+                    },
+
+                } })
+        elif self._ocean.get_transz() is not None:
+            dictionary.update({'transform' : {
                 'name' : 'toWorld',
-                'scale' : {
-                    'x' : str(self._ocean.get_scalexy()),
-                    'y' : str(self._ocean.get_scalexy())
-                },
                 'translate' : {
                     'z' : str(self._ocean.get_transz())
                 }
-            } 
-        }
+            } })             
+            
         return dictionary
     
     def integrator_to_dict(self):
