@@ -136,7 +136,7 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixel
 #bounds  = [-nx * x_spacing / 2, -ny * y_spacing / 2, 0, nx * x_spacing / 2, ny * y_spacing / 2, nz * z_spacing]#-250, -250, 0, 250, 250, 80]   # bounding box = [xmin, ymin, zmin, xmax, ymax, zmax] in meters units 
 
 ## flags
-render_gt_f = True
+render_gt_f = False
 f_multi     = True
 crop_f      = True
 
@@ -216,9 +216,9 @@ beta1   = 0.9  # randomly select beta1 hyperparameter -> sample (1-beta1), r = -
 epsilon = 1e-8
 beta2   = 0.999
 
-Np_vector  = np.array([512]) / 2 #np.array([8192 / 4])
-gt_Np_fac  = 4
-beta0_diff = np.array([50])
+Np_vector  = np.array([512]) / 2
+gt_Np_fac  = 2
+beta0_diff = np.array([40])
 
 sensors_pos   = [ None ] * n_sensors # create an empty list
 algo_scene    = [ None ] * n_sensors # create an empty list
@@ -241,10 +241,10 @@ for i in range(0, n_cores):
     scheduler.registerWorker(LocalWorker(i, 'wrk%i' % i))
 scheduler.start()
 
-#scenes params
+# scenes params
 TOA      = bounds[5]
 H        = z_spacing * nz / 4.
-t_const  = np.array([bounds[3] / 2., bounds[4] / 2., TOA])
+t_const  = np.array([bounds[3] / 2., bounds[4] / 2., TOA * 2. / 3. ])
 up_const = np.array([-1, 0, 0])
 
 # Ground Truth:
@@ -256,7 +256,7 @@ o[0] = np.array([round(bounds[3], 1) / 2., round(bounds[3], 1) / 2., TOA + H])
 t[0] = t_const
 u[0] = up_const
 
-#FOV calc:
+# FOV calc:
 # fov is set by axis x
 max_medium    = np.array([bounds[3], bounds[4], bounds[5]])
 min_medium    = np.array([bounds[0], bounds[1], bounds[2]])
@@ -295,7 +295,7 @@ for ss in range(n_sensors):
     if (not os.path.isfile(gt_out)) or render_gt_f:
         scene_gt[ss] = pyScene()
         scene_gt[ss].create_new_scene(beta=beta_gt, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
-                                 up=sensors_pos[ss]['up'], nSamples=Np_vector[0]*gt_Np_fac, sensorType='perspective', bounding_box=bounds,
+                                 up=sensors_pos[ss]['up'], nSamples=Np_vector[0] * gt_Np_fac, sensorType='perspective', bounding_box=bounds,
                                  fov=fov_deg, width=n_pixels_w, height=n_pixels_h)
 
         I_gt[ss], _ = render_scene(scene_gt[ss]._scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h)
@@ -311,14 +311,14 @@ else:
     I_gt = gt['I_gt']
 
 out_path  = '/home/tamarl/MitsubaGradient/Gradient wrapper/jpl/'
+
+out_name = ''
 if crop_f:
-    out_name = 'crop '
-else:
-    out_name = ''
+    out_name += 'crop '
     
 out_name += 'org jpl cloud with air and ocean ' + str(grid_size) + ' grid points ' + str(n_unknowns) + ' unknowns ' + str(n_sensors) + ' sensors all '
 out_name += 'above the medium 1 cycle ' + str(n_pixels) + ' pixels ' + str(Np_vector[0]) + ' photons ' + str(alpha) + ' adam alpha with space '
-out_name += 'carving mask fix air'
+out_name += 'carving mask'
 
 for bb in range(len(beta0_diff)):
     
@@ -380,14 +380,14 @@ for bb in range(len(beta0_diff)):
         end = time.time()
 
         runtime[bb, iteration] = end - start 
-        if (np.mod(iteration, 500) == 0):
+        if (np.mod(iteration, 500) == 0) and (iteration > 0):
             bb0 = beta0_diff[bb]          
             sio.savemat(out_path + out_name + ' iter ' + str(iteration) + '.mat', 
-                        { 'beta0_diff' : beta0_diff[bb], 'mask' : mask,                   # Scene pre-fixed params
-                          'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,              # Optimization hyper-params
-                          'first_moment' : first_moment, 'second_moment' : second_moment, # Optimization iters params
+                        { 'beta0_diff' : beta0_diff[bb], 'mask' : mask, 'beta_gt' : beta_gt, # Scene pre-fixed params
+                          'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,                 # Optimization hyper-params
+                          'first_moment' : first_moment, 'second_moment' : second_moment,    # Optimization iters params
                           'cost' : cost, 'I_algo': I_algo, 'betas' : betas, 'gradient' : cost_gradient, 'runtime' : runtime, 
-                          'iteration' : iteration})                                       # algorithm calculated variables
+                          'iteration' : iteration})                                          # algorithm calculated variables
 
             iters = np.linspace(1, iteration, iteration) 
             plt.figure(figsize=(19,9))    
@@ -414,11 +414,11 @@ for bb_p in range(len(beta0_diff)):
     betas_err = (tmp_p - beta_gt) / beta_gt * 100
     
     sio.savemat(out_path + out_name + '.mat', 
-                        { 'beta0_diff' : beta0_diff[bb_p], 'mask' : mask,                   # Scene pre-fixed params
-                          'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,              # Optimization hyper-params
-                          'first_moment' : first_moment, 'second_moment' : second_moment, # Optimization iters params
+                        { 'beta0_diff' : beta0_diff[bb_p], 'mask' : mask, 'beta_gt' : beta_gt, # Scene pre-fixed params
+                          'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,                   # Optimization hyper-params
+                          'first_moment' : first_moment, 'second_moment' : second_moment,      # Optimization iters params
                           'cost' : cost, 'I_algo': I_algo, 'betas' : betas, 'gradient' : cost_gradient, 'runtime' : runtime, 
-                          'iteration' : iteration})                                       # algorithm calculated variables
+                          'iteration' : iteration})                                            # algorithm calculated variables
 
     mean_betas_err = np.sum(np.sum(np.sum(abs((tmp_p - beta_gt)), 3), 2), 1) / np.sum(beta_gt.flatten('F'))*100
 
