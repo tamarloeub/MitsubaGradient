@@ -210,7 +210,7 @@ beta1   = 0.9  # randomly select beta1 hyperparameter -> sample (1-beta1), r = -
 epsilon = 1e-8
 beta2   = 0.999
 
-Np_vector  = np.array([512]) / 2
+Np_vector  = np.array([512]) 
 gt_Np_fac  = 2
 beta0_diff = np.array([40])
 
@@ -312,11 +312,11 @@ if crop_f:
     
 out_name += 'org jpl cloud with air and ocean ' + str(grid_size) + ' grid points ' + str(n_unknowns) + ' unknowns ' + str(n_sensors) + ' sensors all '
 out_name += 'above the medium 1 cycle ' + str(n_pixels) + ' pixels ' + str(Np_vector[0]) + ' photons ' + str(alpha) + ' adam alpha with space '
-out_name += 'carving mask'
+out_name += 'carving mask fix air'
 
 load_path = out_path
-load_name = out_name + ' iter 500.mat'
-
+load_name = out_name + '.mat'
+#"air and ocean 729 grid points 729 unknowns 9 sensors all above the medium 1 cycle 324 pixels 512 photons 0.08 adam alpha with space carving mask fix air.mat"
 for bb in range(len(beta0_diff)):
 
     beta0 = np.ones(beta_gt.shape) * beta0_diff[bb]
