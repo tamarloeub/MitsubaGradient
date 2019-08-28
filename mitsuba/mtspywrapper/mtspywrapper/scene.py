@@ -31,7 +31,20 @@ class Ocean(object):
     def get_scalexy(self):
         return self._scalexy
         
+
+class Integrator(object):
+    def __init__(self):
+        self._rrDepth = 5
         
+    def getRR(self):
+        if not self._rrDepth:
+            self.setRR(5)            
+        return self._rrDepth
+    
+    def setRR(self, val):
+        self._rrDepth = int(val)
+        
+    
 class pyScene(object):
     def __init__(self):
         self._scene  = Scene()         
@@ -43,6 +56,7 @@ class pyScene(object):
         self._integrator_str = None
         self._emitter_str    = None
         self._ocean          = Ocean()
+        self._integrator     = Integrator()
 
     def get_scene_beta(self):
         if self._medium == None:
@@ -83,11 +97,15 @@ class pyScene(object):
                 self._sensor.set_fov(fov)
             self._sensor.set_film(width=width, height=height)
 
-    def set_integrator(self):
+    def set_integrator(self, rrDepth=None):
         # Create integrator
+        if rrDepth:
+            self._integrator.setRR(rrDepth)
+            
         self._integrator_str = self._pmgr.create({
             'type' : 'volpath_simple', 
-            'maxDepth' : -1    
+            'maxDepth' : -1,
+            'rrDepth': self._integrator.getRR()
         })
     
     def set_ocean(self):
@@ -149,7 +167,7 @@ class pyScene(object):
 
         self._medium.set_density(beta, bounding_box)   
 
-    def set_scene(self, beta=(), albedo=None, sensorType=None, points=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, bounding_box=None, g=None):
+    def set_scene(self, beta=(), albedo=None, sensorType=None, points=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, bounding_box=None, g=None, rrDepth=None):
         if points is None:
             points = dict()
             points['origin'] = Point(0, 0, 3)
@@ -165,7 +183,7 @@ class pyScene(object):
 
         self.set_medium(beta, albedo, bounding_box, g)
         self.set_sensor_film_sampler(sensorType, points, nSamples, fov_f, fov, width, height)        
-        self.set_integrator()
+        self.set_integrator(rrDepth)
         self.set_emitter()
         self.set_ocean()
         self._scene_set = True
@@ -193,7 +211,7 @@ class pyScene(object):
 
         return self._scene
 
-    def create_new_scene(self, beta=(), albedo=None, sensorType=None, origin=None, target=None, up=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, scene_type='smallMedium', bounding_box=None, g=None):
+    def create_new_scene(self, beta=(), albedo=None, sensorType=None, origin=None, target=None, up=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, scene_type='smallMedium', bounding_box=None, g=None, rrDepth=None):
         if (origin is not None) and (target is not None) and (up is not None):
             points           = dict()
             points['origin'] = origin
@@ -201,7 +219,7 @@ class pyScene(object):
             points['up']     = up     
         else:
             points = None
-        self.set_scene(beta, albedo, sensorType, points, nSamples, fov_f, fov, width, height, bounding_box, g)
+        self.set_scene(beta, albedo, sensorType, points, nSamples, fov_f, fov, width, height, bounding_box, g, rrDepth)
         self.configure_scene(scene_type)
         self.scene_to_xml()
         return
@@ -304,10 +322,14 @@ class pyScene(object):
     def integrator_to_dict(self):
         dictionary = {
             'type'    : 'volpath_simple',
-            'integer' : {
-                'name'  : 'maxDepth',
-                'value' : '-1'
-            }
+            ('integer', 0) : {
+                   'name'  : 'maxDepth',
+                   'value' : '-1'
+            },
+            ('integer', 1) : {
+                   'name'  : 'rrDepth',
+                   'value' : str(self._integrator.getRR())
+            }            
         }
         return dictionary      
 
