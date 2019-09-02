@@ -215,8 +215,8 @@ full_cloud[ind0x, ind0y, ind0z] = 0.01
 n_sensors  = 9
 
 # Update Mask to space curving mask
-mask_name  = 'mask original ' + str(team) + 'with air ' + crop_s + str(np.prod(full_cloud.shape)) + ' grid points ' + str(n_sensors) + ' '
-mask_name += 'sensors above the medium 1 cycle ' + str(np.power(np.max([nx, ny]) * 2, 2)) + ' pixels.mat'
+mask_name  = 'mask original ' + str(team) + 'with air ' + crop_s + str(np.prod(full_cloud.shape)) + ' grid points ' + str(n_sensors) 
+mask_name += ' sensors above the medium 1 cycle ' + str(np.power(np.max([nx, ny]) * 2, 2)) + ' pixels.mat'
 mask       = sio.loadmat(mask_name)
 load_mask  = mask['mask']
 
@@ -264,13 +264,12 @@ bounds = [ 0, 0, 0, nx * x_spacing, ny * y_spacing, nz * z_spacing ]
 ### Algorithm parameters
 ## --------------------------------------------
 ## --------------------------------------------
-max_iterations = 500 * 2#3 * 2 + 1 #500 *3
+max_iterations = 500 * 2
 max_val        = np.max(beta_gt_flat)
 grid_size      = np.prod(beta_gt.shape)
 
 n_unknowns = grid_size
 mb         = np.zeros(max_iterations)
-#betas_zoom_out = np.zeros((max_iterations, nx, ny, nz))
 
 # sensors parameters
 n_pixels_w = np.max([nx, ny]) * 2 # resolution ~= spacing / 2 = 10 meters
@@ -280,7 +279,6 @@ n_pixels   = n_pixels_h * n_pixels_w
 # multi-scale parameters
 fractal_dim = 2 - 0.4
 #grid_ms  = nx / np.round(np.array([ 5., 5.*(fractal_dim), 5.*(fractal_dim)**2, 5.*(fractal_dim)**3, float(nx) ]))
-#grid_ms  = nx / np.round(np.array([ 4., 8., 16., float(nx) ]))
 grid_ms  = nx / np.round(np.array([ 4., 4.*np.sqrt(2), 4.*np.sqrt(2)**2, 4.*np.sqrt(2)**3, 4.*np.sqrt(2)**4, 4.*np.sqrt(2)**5,
                                     4.*np.sqrt(2)**6, float(nx) ]))
 n_stages = len(grid_ms)
@@ -359,8 +357,9 @@ gt_out = ''
 if enlarged_f:
     gt_out += 'enlarged '
 
-gt_out += 'ground truth original ' + str(team) + 'cloud with air and ocean ' + crop_s + str(grid_size) + ' grid points ' + str(n_sensors)
-gt_out += ' sensors all above the medium 1 cycle ' + str(n_pixels) + ' pixels ' + str(Np_vector[0] * gt_Np_fac) + ' photons.mat'
+gt_out += 'ground truth original ' + str(team) + 'cloud with air and ocean ' + crop_s + str(grid_size) + ' grid points '
+gt_out += str(n_sensors) + ' sensors all above the medium 1 cycle ' + str(n_pixels) + ' pixels ' + str(Np_vector[0] * gt_Np_fac)
+gt_out += ' photons.mat'
 
 if (not os.path.isfile(gt_out)) or render_gt_f:
     I_gt     = np.zeros((n_sensors, n_pixels_h, n_pixels_w))
@@ -389,15 +388,26 @@ else:
     gt = sio.loadmat(gt_out)
     I_gt = gt['I_gt']
 
-lambda_factor        = np.array([1e-1])# 0.1, 1e-2,1e-3, 1e-4, 1e-5])
+slambda_v = np.array([1e-1])# 0.1, 1e-2,1e-3, 1e-4, 1e-5])
 laplacian3d          = np.ones((3, 3, 3)) / 26
 laplacian3d[1, 1, 1] = -1
 
-for ll in range(len(lambda_factor)):
-    slambda   = lambda_factor[ll]
+# monotonically increasing by z prior
+mlambda_v = np.array([1])
+kz = np.array([[[1, 0, -1], [1, 0, -1], [1, 0, -1]], 
+               [[1, 0, -1], [1, 0, -1], [1, 0, -1]],
+               [[1, 0, -1], [1, 0, -1], [1, 0, -1]]])
+kz = kz / np.linalg.norm(kz.flatten(), ord=1)
 
+for ll in range(len(slambda_v)):
+    slambda = slambda_v[ll]
+    mlambda = mlambda_v[ll]
+    
     add_path_out  = 'multiscale/'
-    add_path_out += 'smooth/'
+    if mlambda > 0.:
+        add_path_out += 'monoz/'        
+    if slambda > 0.:
+        add_path_out += 'smooth/'
     if crop_f:
         add_path_out += 'crop/'
     if enlarged_f:
@@ -408,13 +418,13 @@ for ll in range(len(lambda_factor)):
     
     if not os.path.exists(out_path):
         os.makedirs(out_path)
-        shutil.copyfile(os.path.realpath(__file__), out_path+'exe_script.py')
+        shutil.copyfile(os.path.realpath(__file__), out_path + 'exe_script.py')
             
-    out_name  = 'stages ' + str(n_stages) + ' lambda ' + str(slambda) + ' with air and ocean ' + crop_s + str(grid_size) + ' grid points '
-    out_name += str(n_unknowns) + ' unknowns ' + str(n_sensors) + ' sensors ' + str(n_pixels) + ' pixels ' + str(Np_vector[0]) + ' photons'
-    out_name += ' changes with scale space carving mask beta0 '
+    out_name  = 'stages ' + str(n_stages) + ' lambda1 ' + str(slambda) + ' lambda2 ' + str(mlambda) + ' with air and ocean '
+    out_name += crop_s + str(grid_size) + ' grid points ' + str(n_unknowns) + ' unknowns ' + str(n_sensors) + ' sensors ' 
+    out_name += str(n_pixels) + ' pixels ' + str(Np_vector[0]) + ' photons changes with scale space carving mask beta0 '
     
-    # Updating the mask to teh grind stages
+    # Updating the mask to teh grid stages
     #ind0x_ms = [ None ] * n_stages
     #ind0y_ms = [ None ] * n_stages
     #ind0z_ms = [ None ] * n_stages
@@ -432,6 +442,7 @@ for ll in range(len(lambda_factor)):
     runtime     = np.zeros((len(beta0_diff), max_iterations))
     cost        = np.zeros((len(beta0_diff), max_iterations))    
     smooth_term = np.zeros((len(beta0_diff), max_iterations))
+    monoZ_term  = np.zeros((len(beta0_diff), max_iterations))
     costMSE     = np.zeros((len(beta0_diff), max_iterations))        
     
     # Loop   
@@ -455,7 +466,7 @@ for ll in range(len(lambda_factor)):
             beta[beta < 0.01] = 0.01
             
         beta0 = zoom(beta, grid_ms[stage] * np.ones(3))
-    
+
         beta_zoom_out        = np.copy(beta0)
         [nx_ms, ny_ms, nz_ms] = beta.shape
         n_pixels_w            = np.max([nx_ms, ny_ms]) * 2 # resolution ~= spacing / 2 = 10 meters
@@ -465,88 +476,68 @@ for ll in range(len(lambda_factor)):
         Np_scale  = (n_stages - 1) * 2 / 2
         grid_size = np.prod(beta.shape)
         
-        #I_algo  = np.zeros((n_sensors, len(beta0_diff), max_iterations, n_pixels_h, n_pixels_w))
         I_algo  = np.zeros((n_sensors, len(beta0_diff), n_pixels_h, n_pixels_w))
-        I_gt_ms = zoom(I_gt, (1, 1 / grid_ms[stage], 1 / grid_ms[stage]))
-    
-        #betas_stage0 = 0
-        #betas_stage1 = 0
-        #betas_stage2 = 0
-        #betas_stage3 = 0
-        #betas_stage4 = 0
-        #betas_stage5 = 0
-        #I_algo_s0 = 0
-        #I_algo_s1 = 0
-        #I_algo_s2 = 0
-        #I_algo_s3 = 0
-        #I_algo_s4 = 0
-        #I_algo_s5 = 0
-        #cost_grad_stage0 = 0    
-        #cost_grad_stage1 = 0
-        #cost_grad_stage2 = 0
-        #cost_grad_stage3 = 0
-        #smooth_grad_s0   = 0
-        #smooth_grad_s1   = 0
-        #smooth_grad_s2   = 0
-        #smooth_grad_s3   = 0
-        
-        #smooth_grad   = np.zeros((len(beta0_diff), max_iterations, nx_ms, ny_ms, nz_ms))
-        #betas         = np.zeros((len(beta0_diff), max_iterations, grid_size))
-        #cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))           
+        I_gt_ms = zoom(I_gt, (1, 1 / grid_ms[stage], 1 / grid_ms[stage]))    
     
         for iteration in range(max_iterations):               
-            #betas[bb, iteration] = beta.flatten('F')                
             if iteration > 0:
                 beta_zoom_out = zoom(beta, (grid_ms[stage], grid_ms[stage], grid_ms[stage]))
     
             mb[iteration] = np.sum(np.sum(np.sum( abs(beta_zoom_out - beta_gt), 2), 1), 0 ) / np.sum( beta_gt_flat ) * 100
-    
-            # Multi scale in number of photons:
-            #if up_scale >= 5:
-                #up_scale = 0
-                #Np_ms /= 2
-                #cost_sat /= 5.
     
             cost_grad = np.zeros(grid_size)
     
             cost_iter = 0
             for ss in range(n_sensors):
                 algo_scene = pyScene()
-                algo_scene.create_new_scene(beta=np.copy(beta), g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], 
-                                            up=sensors_pos[ss]['up'], nSamples=int(Np_vector[0] / Np_ms*Np_scale), sensorType='perspective', 
-                                            fov=fov_deg, bounding_box=bounds, width=n_pixels_w, height=n_pixels_h)
+                algo_scene.create_new_scene(beta=np.copy(beta), origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], ##MAYBE NOT COPT BETA?!?
+                                            up=sensors_pos[ss]['up'], nSamples=int(Np_vector[0]/Np_ms*Np_scale), g=0.85, fov=fov_deg, 
+                                            sensorType='perspective', bounding_box=bounds, width=n_pixels_w, height=n_pixels_h)
     
-                #[ I_algo[ss, bb, iteration-iters_ms[stage-1]], inner_grad ] = render_scene(algo_scene._scene, output_filename, n_cores, grid_size,
-                [ I_algo[ss, bb], inner_grad ] = render_scene(algo_scene._scene, output_filename, n_cores, grid_size,                
-                                                                         n_pixels_w, n_pixels_h)
+                [ I_algo[ss, bb], inner_grad ] = render_scene(algo_scene._scene, output_filename, n_cores, grid_size, n_pixels_w,
+                                                              n_pixels_h)
                 # remove the scene's dir
                 if os.path.exists(os.path.realpath(algo_scene._medium._medium_path)):
                     shutil.rmtree(os.path.realpath(algo_scene._medium._medium_path))
                 #
-                #tmp        =  (-1) * ( zoom(I_algo[ss, bb, iteration-iters_ms[stage-1]], np.array(I_gt[ss].shape, dtype=float)/n_pixels_h ) - I_gt[ss] ) #I_gt_ms[ss])
                 tmp        =  (-1) * ( zoom(I_algo[ss, bb], np.array(I_gt[ss].shape, dtype=float)/n_pixels_h ) - I_gt[ss] ) #I_gt_ms[ss])                
                 tmp        = zoom(tmp, n_pixels_h / np.array(I_gt[ss].shape, dtype=float))
                 cost_grad += np.dot(inner_grad, tmp.flatten('F'))
                 cost_iter += np.linalg.norm(tmp, ord=2)				
     
-            ##cost[bb, iteration] = 0.5 * cost_iter
+            
+            ## smooth prior
             smooth_term[bb, iteration] = np.linalg.norm(ndimage.convolve(beta, laplacian3d, mode='nearest'))
-            #smooth_grad[bb, iteration] = slambda * ndimage.convolve(ndimage.convolve(beta, laplacian3d, mode='nearest'), 
             smooth_grad                = slambda * ndimage.convolve(ndimage.convolve(beta, laplacian3d, mode='nearest'), 
                                                                     laplacian3d, mode='nearest')
-    
             if stage == n_stages - 1:        
                 smooth_grad[ind0x, ind0y, ind0z] = 0.0
-                #smooth_grad[bb, iteration, ind0x, ind0y, ind0z] = 0.0
-    
-            cost[bb, iteration]    = 0.5 * cost_iter + slambda * smooth_term[bb, iteration]  	
-            costMSE[bb, iteration] = 0.5 * cost_iter / n_pixels
+            
+            ## monotonically increasing in z prior
+            indic_b  = np.tanh(beta.flatten('F'))
+            dindic_b = np.cosh(beta.flatten('F'))**(-2)
+            indic_b[beta.flatten('F') <= 0.]  = 0
+            dindic_b[beta.flatten('F') <= 0.] = 0            
+            Dzb  = ndimage.convolve(beta, kz)
+            Dzbf = Dzb.flatten('F')
+            mg1f = np.dot(np.diag(np.cosh(Dzbf / 5.)**(-2)), indic_b)
+            mg1  = ndimage.convolve(np.reshape(mg1f, [nx_ms, ny_ms, nz_ms], 'F'), kz)
+            mgf  = -mlambda * ( mg1.flatten('F') / 5. + np.dot(np.diag(dindic_b), np.tanh(Dzbf / 5.)) )
+            
+            mz_grad = np.reshape(mgf, [nx_ms, ny_ms, nz_ms], 'F')
+            if stage == n_stages - 1:        
+                mz_grad[ind0x, ind0y, ind0z] = 0.0
+                
+            monoZ_term[bb, iteration] = np.dot(np.transpose(indic_b), np.tanh(Dzbf / 5.))
+
+            cost[bb, iteration]    = cost_iter / 2 + slambda * smooth_term[bb, iteration] + mlambda * monoZ_term[bb, iteration]	
+            costMSE[bb, iteration] = cost[bb, iteration] / n_pixels
             
             # Multi scale:        
             if ((stage == 0) and (iteration > cost_window_size * 2)) or ((stage > 0) and 
                                                                          (iteration - iters_ms[stage - 1] > cost_window_size * 2)):
                 if ( abs(np.mean(costMSE[bb, iteration-cost_window_size:iteration]) - 
-                         np.mean(costMSE[bb, iteration-cost_window_size*2:iteration-cost_window_size]) ) < 0.1):#0.2 ):#12 ):
+                         np.mean(costMSE[bb, iteration-cost_window_size*2:iteration-cost_window_size]) ) < 0.1):
                     up_scale = cost_window_size + 1
                 else: # cost is saturated (mean) X times in a row
                     up_scale = 0
@@ -554,9 +545,8 @@ for ll in range(len(lambda_factor)):
             if stage == n_stages - 1:
                 cost_grad[ ind0f ] = 0.0 
                 
-            #cost_gradient[bb, iteration] = cost_grad
-            cost_grad_mat    = np.reshape(cost_grad, [nx_ms, ny_ms, nz_ms], 'F') + smooth_grad#[bb, iteration]
-    
+            cost_grad_mat = np.reshape(cost_grad, [nx_ms, ny_ms, nz_ms], 'F') + smooth_grad + mz_grad
+            
             ## ADAM implementation
             first_moment  = beta1 * first_moment  + (1 - beta1) * cost_grad_mat
             second_moment = beta2 * second_moment + (1 - beta2) * np.power(cost_grad_mat, 2)
@@ -580,42 +570,6 @@ for ll in range(len(lambda_factor)):
             
             # Multi scale in grid resolution:   
             if (up_scale >= cost_window_size + 1) and (stage < (n_stages - 1)):
-                #if   stage == 0:
-                    #betas_stage0 = betas[bb, : iteration + 1]
-                    #I_algo_s0    = I_algo[:, bb, : iteration + 1]
-                    #cost_grad_stage0 = cost_gradient[bb, : iteration + 1]
-                    #smooth_grad_s0   = smooth_grad[bb, : iteration + 1]
-    
-                #elif stage == 1:
-                    #betas_stage1 = betas[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                    #I_algo_s1    = I_algo[:, bb, iters_ms[stage - 1] + 1 : iteration + 1]                    
-                    #cost_grad_stage1 = cost_gradient[bb, iters_ms[stage - 1] + 1 : iteration + 1] 
-                    #smooth_grad_s1   = smooth_grad[bb, iters_ms[stage - 1] + 1 : iteration + 1]                   
-    
-                #elif stage == 2:
-                    #betas_stage2 = betas[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                    #I_algo_s2    = I_algo[:, bb, iters_ms[stage - 1] + 1 : iteration + 1]                                        
-                    #cost_grad_stage2 = cost_gradient[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                    #smooth_grad_s2   = smooth_grad[bb, iters_ms[stage - 1] + 1 : iteration + 1]                    
-    
-                #elif stage == 3:
-                    #betas_stage3 = betas[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                    #I_algo_s3    = I_algo[:, bb, iters_ms[stage - 1] + 1 : iteration + 1]                                        
-                    #cost_grad_stage3 = cost_gradient[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                    #smooth_grad_s3   = smooth_grad[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                
-                #elif stage == 4:
-                    #betas_stage4 = betas[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                    #I_algo_s4    = I_algo[:, bb, iters_ms[stage - 1] + 1 : iteration + 1]                                        
-                    #cost_grad_stage3 = cost_gradient[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                    #smooth_grad_s3   = smooth_grad[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                
-                #elif stage == 5:
-                    #betas_stage5 = betas[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                    #I_algo_s5    = I_algo[:, bb, iters_ms[stage - 1] + 1 : iteration + 1]                                        
-                    #cost_grad_stage3 = cost_gradient[bb, iters_ms[stage - 1] + 1 : iteration + 1]
-                    #smooth_grad_s3   = smooth_grad[bb, iters_ms[stage - 1] + 1 : iteration + 1] 
-                    
                 iters_ms[stage] = iteration                                
                 up_scale        = 0                
                 stage          += 1 
@@ -637,10 +591,8 @@ for ll in range(len(lambda_factor)):
                 n_pixels_w            = np.max([nx_ms, ny_ms]) * 2 # resolution ~= spacing / 2 = 10 meters
                 n_pixels_h            = np.max([nx_ms, ny_ms]) * 2    
                 n_pixels              = n_pixels_w * n_pixels_h # !! T
-                #Np_vector             = np.array([512])#photons_total / n_pixels
                 grid_size             = np.prod(beta.shape)            
     
-                #I_algo  = np.zeros((n_sensors, len(beta0_diff), max_iterations - (iteration + 1), n_pixels_h, n_pixels_w))            
                 I_algo  = np.zeros((n_sensors, len(beta0_diff), n_pixels_h, n_pixels_w))                            
                 I_gt_ms = zoom(I_gt, (1, 1/grid_ms[stage], 1/grid_ms[stage]), mode='nearest')
     
@@ -657,52 +609,30 @@ for ll in range(len(lambda_factor)):
                 [ nx_ms, ny_ms, nz_ms ] = beta.shape
                 grid_size               = np.prod(beta.shape)
                 #cost_window_size       *= 2
-                #betas         = np.zeros((len(beta0_diff), max_iterations - (iteration + 1), grid_size)) # check
-                #cost_gradient = np.zeros((len(beta0_diff), max_iterations, grid_size))
-                #smooth_grad   = np.zeros((len(beta0_diff), max_iterations, nx_ms, ny_ms, nz_ms))
                 
                 sio.savemat(out_path + out_name + ' start of stage ' + str(stage) + '.mat', 
-                            { 'beta0_diff' : beta0_diff[bb], 'mask' : mask, 'beta_gt' : beta_gt,          # Scene pre-fixed params
-                              'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,                          # Optimization hyper-params
-                              'slambda' : slambda,# 'smooth_g_s0' : smooth_grad_s0, 'smooth_g_s1' : smooth_grad_s1, 
-                              #'smooth_g_s2' : smooth_grad_s2, 'smooth_g_s3' : smooth_grad_s3,            # smooth prior
-                              'first_moment' : first_moment, 'second_moment' : second_moment,             # Optimization iters params
-                              'Np_ms' : Np_ms, 'grid_ms' : grid_ms, 'stage' : stage, 'iters_ms' : iters_ms, #'cost_sat' : cost_sat,
-                              #'betas_s0' : betas_stage0, 'betas_s1' : betas_stage1, 'betas_s2' : betas_stage2, 
-                              #'betas_s3' : betas_stage3, 'betas_s4' : betas_stage4, 'betas_s5' : betas_stage5, 
-                              #'I_algo_s0' : I_algo_s0, 'I_algo_s1' : I_algo_s1, 'I_algo_s2' : I_algo_s2, 'I_algo_s3' : I_algo_s3,
-                              #'I_algo_s4' : I_algo_s4, 'I_algo_s5': I_algo_s5, 
-                              'mb' : mb, 'alpha_scale' : alpha_scale, 
-                              #'cost_grad_s0' : cost_grad_stage0, 'cost_grad_s1' : cost_grad_stage1, 'cost_grad_s2' : cost_grad_stage2,
-                              # 'cost_grad_s3' : cost_grad_stage3,  'betas_zoom_out' : betas_zoom_out,   # Multiscale
-                              'cost' : cost, 'I_algo': I_algo, 'runtime' : runtime, #'betas' : betas, 'gradient' : cost_gradient, 
-                              'iteration' : iteration, 'beta' : beta, 'costMSE' : costMSE })             # algorithm calculated variables
+                            { 'beta0_diff' : beta0_diff[bb], 'mask' : mask, 'beta_gt' : beta_gt,   # Scene pre-fixed params
+                              'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,                   # Optimization hyper-params
+                              'smooth_lambda' : slambda, 'smooth_term' : smooth_term,              # Smooth prior
+                              'monoz_lambda' : mlambda, 'monoZ_term' : monoZ_term,                 # Monotonically increasing z prior
+                              'first_moment' : first_moment, 'second_moment' : second_moment,      # Optimization iters params
+                              'stage' : stage, 'iters_ms' : iters_ms, 'alpha_scale' : alpha_scale, 
+                              'Np_ms' : Np_ms, 'grid_ms' : grid_ms,                                # Multiscale
+                              'cost' : cost, 'I_algo': I_algo, 'runtime' : runtime, 'beta' : beta, 
+                              'iteration' : iteration, 'mb' : mb, 'costMSE' : costMSE })           # algorithm calculated variables
     
             if (np.mod(iteration, 20) == 0) and (iteration > 0):
                 bb0 = beta0_diff[bb]     
                 sio.savemat(out_path + out_name + ' iter.mat', 
-                            { 'beta0_diff' : beta0_diff[bb], 'mask' : mask, 'beta_gt' : beta_gt,          # Scene pre-fixed params
-                              'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,                          # Optimization hyper-params
-                              'slambda' : slambda,# 'smooth_g_s0' : smooth_grad_s0, 'smooth_g_s1' : smooth_grad_s1, 
-                              #'smooth_g_s2' : smooth_grad_s2, 'smooth_g_s3' : smooth_grad_s3,            # smooth prior
-                              'first_moment' : first_moment, 'second_moment' : second_moment,             # Optimization iters params
-                              'Np_ms' : Np_ms, 'grid_ms' : grid_ms, 'stage' : stage, 'iters_ms' : iters_ms, #'cost_sat' : cost_sat,
-                              #'betas_s0' : betas_stage0, 'betas_s1' : betas_stage1, 'betas_s2' : betas_stage2, 
-                              #'betas_s3' : betas_stage3, 'betas_s4' : betas_stage4, 'betas_s5' : betas_stage5, 
-                              #'I_algo_s0' : I_algo_s0, 'I_algo_s1' : I_algo_s1, 'I_algo_s2' : I_algo_s2, 'I_algo_s3' : I_algo_s3,
-                              'mb' : mb, 'alpha_scale' : alpha_scale, #'I_algo_s4' : I_algo_s4, 'I_algo_s5': I_algo_s5,  
-                              #'cost_grad_s0' : cost_grad_stage0, 'cost_grad_s1' : cost_grad_stage1, 'cost_grad_s2' : cost_grad_stage2,
-                              # 'cost_grad_s3' : cost_grad_stage3,  'betas_zoom_out' : betas_zoom_out,   # Multiscale
-                              'cost' : cost, 'I_algo': I_algo, 'runtime' : runtime, #'gradient' : cost_gradient, 'betas' : betas, 
-                              'iteration' : iteration, 'beta' : beta, 'costMSE' : costMSE })             # algorithm calculated variables
-    
-                #iters = np.linspace(1, iteration, iteration) 
-                #plt.figure(figsize=(19,9))    
-                #plt.plot(iters, cost[bb,0:iteration], '--',  marker='o', markersize=5)
-                #plt.title('Cost', fontweight='bold')  
-                #plt.grid(True)
-                #plt.xlim(left=0)
-                #plt.savefig(out_path + out_name + ' iter cost.png', dpi=300)                
+                            { 'beta0_diff' : beta0_diff[bb], 'mask' : mask, 'beta_gt' : beta_gt,   # Scene pre-fixed params
+                              'alpha' : alpha, 'beta1' : beta1, 'beta2' : beta2,                   # Optimization hyper-params
+                              'smooth_lambda' : slambda, 'smooth_term' : smooth_term,              # Smooth prior
+                              'monoz_lambda' : mlambda, 'monoZ_term' : monoZ_term,                 # Monotonically increasing z prior
+                              'first_moment' : first_moment, 'second_moment' : second_moment,      # Optimization iters params
+                              'stage' : stage, 'iters_ms' : iters_ms, 'alpha_scale' : alpha_scale, 
+                              'Np_ms' : Np_ms, 'grid_ms' : grid_ms,                                # Multiscale
+                              'cost' : cost, 'I_algo': I_algo, 'runtime' : runtime, 'beta' : beta, 
+                              'iteration' : iteration, 'mb' : mb, 'costMSE' : costMSE })           # algorithm calculated variables
 
     curr_iter = iteration
     #I_algo_p  = I_algo[:, :, 0:curr_iter]
