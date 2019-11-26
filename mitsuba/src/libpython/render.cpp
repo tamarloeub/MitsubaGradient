@@ -149,12 +149,24 @@ static bp::list scene_getSensors(Scene *scene) {
 static bp::list scene_getTotalGradient(Scene *scene) {
 	bp::list list;
 	int gridSize = scene->getTotalGridSize();
-	int nPixels  = scene->getTotalImageSize();
-	for (int i=0; i<nPixels*gridSize; ++i) {
+	//int nPixels  = scene->getTotalImageSize(); //T ! acc_runtime
+	//for (int i=0; i<nPixels*gridSize; ++i) { //T ! acc_runtime
+	for (int i=0; i<gridSize; ++i) { //T ! acc_runtime
 		list.append(scene->getTotalGradient_f(i));
 	}
 	return list;
 }
+
+//Tamar - spec acc_runtime
+static void scene_setSpecGt(Scene *scene, bp::list list_in) {//}, int nPixels) {
+	int nPixels = bp::len(list_in);
+	for (int i=0; i<nPixels; ++i) {
+		Float specGt = bp::extract<Float>(list_in[i]);
+		scene->setSpecGt(specGt, i, nPixels);
+		
+	}
+}
+//end acc_runtime
 
 static bp::object scene_getSensor(Scene *scene) { return cast(scene->getSensor()); }
 static bp::object scene_getIntegrator(Scene *scene) { return cast(scene->getIntegrator()); }
@@ -417,7 +429,9 @@ void export_render() {
 		.def("getKDTree", scene_getKDTree, BP_RETURN_VALUE)
 		.def("getDensityDerivative", &Scene::getDensityDerivative, BP_RETURN_VALUE)
 		// Tamar
-		.def("__repr__", &Scene::toString);
+		.def("__repr__", &Scene::toString)
+		.def("setSpecGt", &scene_setSpecGt);//T ! acc_runtime
+		
 
 	BP_CLASS(Sampler, ConfigurableObject, bp::no_init)
 		.def("clone", &Sampler::clone, BP_RETURN_VALUE)

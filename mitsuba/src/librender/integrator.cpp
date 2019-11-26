@@ -178,12 +178,13 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 		sampler->generate(offset);
 
 		if (DEBUG_TAMAR) {
-			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-				cout << "densityDerivative at " << i << " = " << densityDerivative[i].toString() << endl;
+			for(std::vector<int>::size_type ii = 0; ii != densityDerivative.size(); ii++) {
+				cout << "densityDerivative at " << ii << " = " << densityDerivative[ii].toString() << endl;
 			}
 		}
 
 		bool print_out = false;
+		Spectrum specPixel = Spectrum(0.0); //T ! acc_runtime
 
 		for (size_t j = 0; j<sampler->getSampleCount(); j++) {
 			rRec.newQuery(queryType, sensor->getMedium());
@@ -204,24 +205,29 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 
 			spec *= Li(sensorRay, rRec, Smk, print_out);
 
-			for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-				densityDerivative[i] += Smk[i];
+			for(std::vector<int>::size_type ii = 0; ii != densityDerivative.size(); ii++) {
+				densityDerivative[ii] += Smk[ii];
 			}
-
+			specPixel += spec; // in the case of the first implementation its like mean (19/11/2019) Tamar
 			block->put(samplePos, spec, rRec.alpha);
 			sampler->advance();
-		}
-
-		for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-			densityDerivative[i] /= Spectrum(sampler->getSampleCount());
 		}
 
 		Scene *scene_notconst = const_cast<Scene*> (rRec.scene);
 		
 		int img_size = rRec.scene->getTotalImageSize();
 		int index = offset[0] * sqrt(img_size) + offset[1];
-		for(std::vector<int>::size_type i = 0; i != densityDerivative.size(); i++) {
-			scene_notconst->setTotalGradient(densityDerivative[i][0], index, i);
+		
+		Float* specGt = rRec.scene->getSpecGt(); //T ! acc_runtime
+		Float pixel_out = specPixel[0] / sampler->getSampleCount(); //T ! acc_runtime
+		Float pixel_err = specGt[index] - pixel_out; //T ! acc_runtime
+				
+		for(std::vector<int>::size_type ii = 0; ii != densityDerivative.size(); ii++) {
+			densityDerivative[ii] *= Spectrum( pixel_err / sampler->getSampleCount() );
+		}
+
+		for(std::vector<int>::size_type ii = 0; ii != densityDerivative.size(); ii++) {
+			scene_notconst->setTotalGradient(densityDerivative[ii][0], index, ii);
 		}
 	}
 }

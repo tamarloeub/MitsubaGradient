@@ -107,6 +107,7 @@ Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
 	Vector2i filmSize = m_sensor->getFilm()->getSize();
 	m_nPixels = filmSize.x * filmSize.y;
 	m_total_grad = scene->m_total_grad;
+	m_specGt = scene->m_specGt; //T ! acc_runtime
 	m_densityDerivative.resize(m_gridSize);
 	std::fill(m_densityDerivative.begin(), m_densityDerivative.end(), Spectrum(0.0f));
 }
@@ -453,11 +454,12 @@ bool Scene::preprocess(RenderQueue *queue, const RenderJob *job,
 			it != m_ssIntegrators.end(); ++it)
 		(*it)->setActive(true);
 
-	Vector2i filmSize = m_sensor->getFilm()->getSize();//this->getSensor()->getFilm()->getSize()
-	m_nPixels = filmSize.x * filmSize.y;
+	//Vector2i filmSize = m_sensor->getFilm()->getSize();//this->getSensor()->getFilm()->getSize() //T ! acc_runtime
+	//m_nPixels = filmSize.x * filmSize.y; //T ! acc_runtime
 	Medium* medium_s = m_media.begin()->get();
 	m_gridSize = medium_s->getDensityVolumeSize();
-	m_total_grad = new Float[m_gridSize * m_nPixels];
+	//m_total_grad = new Float[m_gridSize * m_nPixels];//T ! acc_runtime
+	m_total_grad = new Float[m_gridSize]();//T ! acc_runtime
 	return true;
 }
 

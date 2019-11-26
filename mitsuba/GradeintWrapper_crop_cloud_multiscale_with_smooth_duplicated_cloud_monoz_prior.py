@@ -89,7 +89,7 @@ def get_grad_from_output_file(filename):
     f.close()
     return grad
 
-def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h):    
+def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixels_h, Igt=None):    
     queue = RenderQueue()
 
     # Create a queue for tracking render jobs
@@ -102,6 +102,9 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixel
 
     scene.setDestinationFile(output_filename)    
 
+    #for p in range(n_pixels_h*n_pixels_w):
+        #scene.setSpecGt(float(Igt[p]), p)
+    scene.setSpecGt(list(Igt))#, int(n_pixels_h*n_pixels_w))
     # Create a render job and insert it into the queue
     job = RenderJob('render', scene, queue)
     job.start()
@@ -120,8 +123,9 @@ def render_scene(scene, output_filename, n_cores, grid_size, n_pixels_w, n_pixel
     #outFile.close()
 
     radiance   = np.array(bitmap.buffer()) 
-    inner_grad_tmp = scene.getTotalGradient()
-    inner_grad = np.reshape(inner_grad_tmp, [grid_size, n_pixels_w * n_pixels_h], 'F')
+    inner_grad = np.array(scene.getTotalGradient())
+    #inner_grad_tmp = scene.getTotalGradient()
+    #inner_grad = np.reshape(inner_grad_tmp, [grid_size, n_pixels_w * n_pixels_h], 'F')
     #inner_grad = np.reshape(inner_grad_tmp, [grid_size, n_pixels_w, n_pixels_h])
 
     return radiance, inner_grad
@@ -144,6 +148,7 @@ render_gt_f = False
 parallel_f  = True
 crop_f      = False
 enlarged_f  = False
+debug_f     = True
 
 ### Loading a cloud
 
@@ -331,7 +336,7 @@ iters_ms = np.zeros(n_stages, dtype=int)
 alpha       = 0.3 # 0.08 # randomly select alpha hyperparams -> r = -a * np.random.rand() ; alpha = 10**(r) - randomly selected from a logarithmic scale
 alpha_scale = 1   # (0.15/0.5)**(1. / (n_stages - 1))
 beta1       = 0.9 # randomly select beta1 hyperparams -> sample (1-beta1), r = -a * np.random.uniform(-3, -1) ; beta1 = 1 - 10**(r) - randomly 
-                    # selected from a logarithmic scale
+                  # selected from a logarithmic scale
 epsilon     = 1e-8
 beta2       = 0.999
 
@@ -402,7 +407,7 @@ max_medium    = np.array([bounds[3], bounds[4], bounds[5]])
 min_medium    = np.array([bounds[0], bounds[1], bounds[2]])
 medium_center = ( max_medium + min_medium ) / 2
 
-L       = np.max([max_medium[0] - min_medium[0], max_medium[1] - min_medium[1]]) / 2 #camera's FOV covers the whole medium
+L = np.max([max_medium[0] - min_medium[0], max_medium[1] - min_medium[1]]) / 2 #camera's FOV covers the whole medium
 if crop_s == 'c2 ':
     fov_rad = 2 * np.arctan(L / ((TOA + H) / 3) )
 elif crop_s == 'small cf ':
@@ -411,25 +416,26 @@ else:
     fov_rad = 2 * np.arctan(L / ((TOA + H) / 4) )
 fov_deg = 180 * fov_rad / np.pi
 
+## Setting the formation of the cameras - a dome or a cycle:
 n_cycles = 1
 #formation_s = 'cycle '
-## creating a Dome and not a Cycle:
 formation_s = 'dome '
-r_toa    = np.linalg.norm(o[0]-t_const) # creating a Dome and not a Circle
+r_toa       = np.linalg.norm(o[0]-t_const) # creating a Dome and not a Circle
+
 for rr in range(n_cycles):
     if crop_s == 'c2 'or crop_s == 'small cf ':
-        sensors_radius = y_spacing * (ny + 16) / 2 #c2    
+        sensors_radius = y_spacing * (ny + 16) / 2     
     else:
         sensors_radius = y_spacing * (ny + 12) / 2
     for ss in range(n_sensors-1):
-        theta     = 2 * np.pi / (n_sensors - 1) * ss
+        theta = 2 * np.pi / (n_sensors - 1) * ss
         o[ss + 1 + rr*4] = np.array([round(o[0][0] + sensors_radius * np.cos(theta), 2), 
                                      round(o[0][1] + sensors_radius * np.sin(theta), 2), TOA + H])     
 
         # dome
         o[ss + 1 + rr*4][2] = np.sqrt(r_toa**2 - (o[ss + 1 + rr*4][0] - o[0][0])**2 - (o[ss + 1 + rr*4][1]-o[0][1])**2 ) + t_const[2]
-        t[ss + 1 + rr*4] = t_const
-        u[ss + 1 + rr*4] = up_const
+        t[ss + 1 + rr*4]    = t_const
+        u[ss + 1 + rr*4]    = up_const
 
 gt_out = ''
 if enlarged_f:
@@ -509,7 +515,7 @@ for ll in range(len(slambda_v)):
 
     out_name  = 'stages ' + str(n_stages) + ' lambda1 ' + str(slambda) + ' lambda2 ' + str(mlambda) + ' w air and ocean '
     out_name += crop_s + str(grid_size) + ' grid points ' + str(n_sensors) + ' sensors in 1 ' + formation_s 
-    out_name += str(n_pixels) + ' pixels ' + str(Np_vector[0]) + rr_str + ' photons changes w scale  w 2nd mom SC mask beta0 '
+    out_name += str(n_pixels) + ' pixels ' + str(Np_vector[0]) + rr_str + ' photons changes w scale w 2nd mom SC mask beta0 '
 
     # Updating the mask to teh grid stages
     #ind0x_ms = [ None ] * n_stages
@@ -527,8 +533,8 @@ for ll in range(len(slambda_v)):
         #ind0f_ms[st]                = np.where(mask_ms.flatten('F') <= 0)
 
     runtime     = np.zeros((len(beta0_diff), max_iterations))
-    cost_data = np.zeros((len(beta0_diff), max_iterations))  
-    cost_mean = np.zeros((len(beta0_diff), max_iterations))        
+    cost_data   = np.zeros((len(beta0_diff), max_iterations))  
+    cost_mean   = np.zeros((len(beta0_diff), max_iterations))        
     smooth_term = np.zeros((len(beta0_diff), max_iterations))
     monoZ_term  = np.zeros((len(beta0_diff), max_iterations))
 
@@ -576,11 +582,16 @@ for ll in range(len(slambda_v)):
 
             mb[iteration] = np.sum(np.sum(np.sum( abs(beta_zoom_out - beta_gt), 2), 1), 0 ) / np.sum( beta_gt_flat ) * 100
             mass_err[iteration] = (np.sum(abs(beta_zoom_out.flatten('F'))) - np.sum(abs(beta_gt_flat))) / np.sum( beta_gt_flat ) * 100
+            
+            if debug_f:
+    			print("iteration = " + str(iteration))
+                print("error = " + str(np.round(mb[iteration],2)))
 
             cost_grad = np.zeros(grid_size)
 
             cost_iter = 0
             for ss in range(n_sensors):
+                I_gt_zoomed = zoom(I_gt[ss], n_pixels_h/np.array(I_gt[ss].shape, dtype=float))
                 algo_scene = pyScene()
                 algo_scene.create_new_scene(beta=np.copy(beta), origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'], ##MAYBE NOT COPT BETA?!?
                                             up=sensors_pos[ss]['up'], nSamples=int(Np_vector[0]/Np_ms*Np_scale), g=0.85, fov=fov_deg, 
@@ -588,15 +599,16 @@ for ll in range(len(slambda_v)):
                                             rrDepth=rr_depth)
 
                 [ I_algo[ss, bb], inner_grad ] = render_scene(algo_scene._scene, output_filename, n_cores, grid_size, n_pixels_w,
-                                                              n_pixels_h)
+                                                              n_pixels_h, I_gt_zoomed.flatten('F'))
                 # remove the scene's dir
                 if os.path.exists(os.path.realpath(algo_scene._medium._medium_path)):
                     shutil.rmtree(os.path.realpath(algo_scene._medium._medium_path))
                 #
-                tmp        =  (-1) * ( zoom(I_algo[ss, bb], np.array(I_gt[ss].shape, dtype=float)/n_pixels_h ) - I_gt[ss] ) #I_gt_ms[ss])                
-                tmp        = zoom(tmp, n_pixels_h / np.array(I_gt[ss].shape, dtype=float))
-                cost_grad += np.dot(inner_grad, tmp.flatten('F'))
-                cost_iter += np.linalg.norm(tmp, ord=2)				
+                #tmp        =  (-1) * ( zoom(I_algo[ss, bb], np.array(I_gt[ss].shape, dtype=float)/n_pixels_h ) - I_gt[ss] ) #I_gt_ms[ss])                
+                #tmp        = zoom(tmp, n_pixels_h / np.array(I_gt[ss].shape, dtype=float))
+                #cost_iter += np.linalg.norm(tmp, ord=2)
+                cost_grad += inner_grad#np.dot(inner_grad, tmp.flatten('F'))
+                cost_iter += np.linalg.norm(I_gt_zoomed - I_algo[ss, bb], ord=2)
 
             cost_grad_mat  = np.zeros_like(beta)
 
@@ -612,7 +624,8 @@ for ll in range(len(slambda_v)):
             monoZ_term[bb, iteration] = np.dot(np.transpose(indic_b), np.tanh(Dzbf / 5.))
 
             #if stage >= n_stages - 2:
-            smooth_grad = slambda * prior_w  * ndimage.convolve(ndimage.convolve(beta, laplacian3d, mode='nearest'), laplacian3d, mode='nearest')
+            smooth_grad = slambda * prior_w  * ndimage.convolve(ndimage.convolve(beta, laplacian3d, mode='nearest'), laplacian3d, 
+                                                                mode='nearest')
 
             dindic_b = np.cosh(beta.flatten('F') / 20.)**(-2) / 20.
             dindic_b[beta.flatten('F') <= 0.01] = 0            

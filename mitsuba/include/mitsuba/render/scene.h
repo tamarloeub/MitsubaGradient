@@ -1112,8 +1112,23 @@ public:
 	inline const int getTotalGridSize() const { return m_gridSize; }
 
 	void setTotalGradient(Float grad_f, int index, int i) {
-		m_total_grad[m_gridSize * index + i] = grad_f;
+		/*m_total_grad[m_gridSize * index + i] = grad_f; //T ! acc_runtime*/
+		m_total_grad[i] += grad_f; //T ! acc_runtime
 	}
+
+	//Tamar - specGt	acc_runtime
+	inline float* getSpecGt() const { return m_specGt; }
+	
+	inline const bool isSpecGtNull() const { return m_specGtNull; }	
+	
+	void setSpecGt(Float specGt, int i, int nPixels) {
+		if ((m_specGtNull) or (i == 0) ){
+			m_specGt = new Float[nPixels];
+		}
+		m_specGtNull = false;
+		m_specGt[i]  = specGt;
+	}	
+	//T ! end acc_runtime
 
 	/// Return the name of the file containing the original description of this scene
 	inline const fs::path &getSourceFile() const { return *m_sourceFile; }
@@ -1182,6 +1197,8 @@ private:
 	Float* m_total_grad;
 	int m_gridSize;
 	int m_nPixels;
+	Float* m_specGt; //T ! acc_runtime
+	bool m_specGtNull; //T ! acc_runtime
 
 };
 
