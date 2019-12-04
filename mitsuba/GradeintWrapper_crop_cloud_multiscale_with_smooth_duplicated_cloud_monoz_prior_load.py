@@ -351,7 +351,7 @@ sensors_pos = [ None ] * n_sensors # create an empty list
 output_filename = 'renderedResult'
 
 if parallel_f: # Set parallel job or run on 1 cpu only
-    n_cores = 20 #multiprocessing.cpu_count() # T if others are running
+    n_cores = multiprocessing.cpu_count() # T if others are running
 else:
     n_cores = 1
 

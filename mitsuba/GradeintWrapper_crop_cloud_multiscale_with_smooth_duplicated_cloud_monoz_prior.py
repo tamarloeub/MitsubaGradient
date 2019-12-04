@@ -351,7 +351,7 @@ sensors_pos = [ None ] * n_sensors # create an empty list
 output_filename = 'renderedResult'
 
 if parallel_f: # Set parallel job or run on 1 cpu only
-    n_cores = 20 #multiprocessing.cpu_count() # T if others are running
+    n_cores = multiprocessing.cpu_count() # T if others are running
 else:
     n_cores = 1
 
@@ -584,7 +584,7 @@ for ll in range(len(slambda_v)):
             mass_err[iteration] = (np.sum(abs(beta_zoom_out.flatten('F'))) - np.sum(abs(beta_gt_flat))) / np.sum( beta_gt_flat ) * 100
             
             if debug_f:
-    			print("iteration = " + str(iteration))
+                print("iteration = " + str(iteration))
                 print("error = " + str(np.round(mb[iteration],2)))
 
             cost_grad = np.zeros(grid_size)
