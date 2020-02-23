@@ -168,9 +168,11 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 	bool DEBUG_TAMAR = false;
 	//build densityDerivative
 	std::vector<Spectrum> densityDerivative = rRec.scene->getDensityDerivative();
-	std::fill(densityDerivative.begin(), densityDerivative.end(), Spectrum(0.0));
-
+	
 	for (size_t i = 0; i<points.size(); ++i) {
+		// initialize densityDerivative to zero (after calculated into inner gradient)
+		std::fill(densityDerivative.begin(), densityDerivative.end(), Spectrum(0.0));
+		
 		Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
 		if (stop)
 			break;
@@ -222,8 +224,11 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 		Float pixel_out = specPixel[0] / sampler->getSampleCount(); //T ! acc_runtime
 		Float pixel_err = specGt[index] - pixel_out; //T ! acc_runtime
 				
+		int grid_size = rRec.scene->getTotalGridSize();
+		Float pixelToVoxelF = sqrt(img_size) / pow(grid_size, 1.0/3.0);
 		for(std::vector<int>::size_type ii = 0; ii != densityDerivative.size(); ii++) {
-			densityDerivative[ii] *= Spectrum( pixel_err / sampler->getSampleCount() );
+			densityDerivative[ii] /= Spectrum(sampler->getSampleCount() * pixelToVoxelF);
+			densityDerivative[ii] *= Spectrum(pixel_err);
 		}
 
 		for(std::vector<int>::size_type ii = 0; ii != densityDerivative.size(); ii++) {

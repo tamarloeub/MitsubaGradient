@@ -459,7 +459,7 @@ bool Scene::preprocess(RenderQueue *queue, const RenderJob *job,
 	Medium* medium_s = m_media.begin()->get();
 	m_gridSize = medium_s->getDensityVolumeSize();
 	//m_total_grad = new Float[m_gridSize * m_nPixels];//T ! acc_runtime
-	m_total_grad = new Float[m_gridSize]();//T ! acc_runtime
+	m_total_grad = new Float[m_gridSize](); // This operator initialize all elements in array to zero //T ! acc_runtime
 	return true;
 }
 

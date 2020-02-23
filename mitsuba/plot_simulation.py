@@ -1,8 +1,11 @@
 
 ## '../Gradient wrapper/jpl/multiscale/monoz/smooth/19_09_09_15:13/stages 8 lambda1 0.2 lambda2 1 with air and ocean 54872 grid points 54872 unknowns 9 sensors 5776 pixels 1024 rrDepth 3 photons changes with scale space carving mask beta0 2' + ' iter.mat'
-
-
-zz_max = [ np.max([ beta[:, :, zz], beta_gt[:, :, zz] ]) for zz in range(nz_ms) ]
+if stage == n_stages - 1:
+    beta_gt_ms = beta_gt
+else:
+    beta_gt_ms = zoom(beta_gt, 1./grid_ms[stage])
+    
+zz_max = [ np.max([ beta[:, :, zz], beta_gt_ms[:, :, zz] ]) for zz in range(nz_ms) ]
 
 plt.figure(figsize=(19,9))
 for zz in range(nz_ms):     
@@ -17,15 +20,15 @@ plt.suptitle('curr beta [1/km]', fontweight='bold')
 plt.figure(figsize=(19,9))
 for zz in range(nz_ms):    
     plt.subplot(int(np.ceil(np.sqrt(nz_ms))), int(np.ceil(np.sqrt(nz_ms))), zz + 1)               
-    plt.imshow(beta_gt[:, :, zz])
+    plt.imshow(beta_gt_ms[:, :, zz])
     plt.title( 'z = ' + str(zz+1) )
     plt.clim(0.01, zz_max[zz])
     plt.colorbar()
     plt.axis('off')
 plt.suptitle('beta gt [1/km]', fontweight='bold')
 
-diff_map = (beta_gt - beta)
-diff_map[abs(diff_map) <= 0.05] =0
+diff_map = (beta_gt_ms - beta)
+diff_map[abs(diff_map) <= 0.05] = 0
 
 plt.figure(figsize=(19,9))
 for zz in range(nz_ms):    
