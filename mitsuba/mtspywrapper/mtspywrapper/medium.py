@@ -98,7 +98,7 @@ class pyMedium(object):
             volume = volume[..., np.newaxis]
         
         ## need to be in seperate function.
-        #Duplicate dimensions with 1 cell (currently mitsuba accepts only >2 grid points per dimension)
+        # Duplicate dimensions with 1 cell (currently mitsuba accepts only >2 grid points per dimension)
         shape = volume.shape
         dup = [1, 1, 1, 1]
         for i in range(3):
@@ -128,8 +128,8 @@ class pyMedium(object):
         assert ( (volume.max() <= 1) and (volume.min() >= 0) ), "Values of albedo should be between 0 to 1" 
 
         if volume.ndim == 4:
-            assert (volume.shape[3] == 3),"albedo fourth dimention should be of size 3"
-            
+            assert (volume.shape[3] == 3), "albedo fourth dimension should be of size 3"
+
         if volume.shape == ():
             self._albedo = data
         else:
@@ -138,7 +138,7 @@ class pyMedium(object):
             else:
                 assert self._shape[:,:,:] == volume.shape, "Grid volume does not agree with medium shape" 
             if (volume.ndim <= 3):
-                self._albedo = dup_volume(volume, [1, 1, 1, 3])
+                self._albedo = self.dup_volume(volume, [1, 1, 1, 3])
             self.set_vol_file(self._albedo, 'albedo')
     
     def set_phase(self, data=0.85):

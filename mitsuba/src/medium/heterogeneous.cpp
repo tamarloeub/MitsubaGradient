@@ -794,7 +794,6 @@ public:
 			Sampler *sampler, bool print_out) const {
 		Float integratedDensity, densityAtMinT, densityAtT;
 		bool success = false;
-//		bool DEBUG_TAMAR = 1;
 		bool DEBUG_TAMAR = print_out;
 
 		if (m_method == ESimpsonQuadrature) {
@@ -894,8 +893,7 @@ public:
 					mRec.p = p;
 					Spectrum albedo = m_albedo->lookupSpectrum(p);
 					mRec.sigmaS = albedo * densityAtT;
-					// Tamar
-					mRec.beta   = densityAtT;
+					mRec.beta   = densityAtT; // Tamar					
 					mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 					mRec.transmittance = Spectrum(densityAtT != 0.0f ? 1.0f / densityAtT : 0);
 					if (!std::isfinite(mRec.transmittance[0])) // prevent rare overflow warnings
