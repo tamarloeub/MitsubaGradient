@@ -34,6 +34,7 @@ Medium::Medium(const Properties &props)
 	m_sigmaS *= Spectrum(1.0f) - g;
 
 	m_sigmaT = m_sigmaA + m_sigmaS;
+	m_random = new Random();
 }
 
 Medium::Medium(Stream *stream, InstanceManager *manager)
@@ -42,6 +43,7 @@ Medium::Medium(Stream *stream, InstanceManager *manager)
 	m_sigmaA = Spectrum(stream);
 	m_sigmaS = Spectrum(stream);
 	m_sigmaT = m_sigmaA + m_sigmaS;
+	m_random = new Random();
 }
 
 void Medium::addChild(const std::string &name, ConfigurableObject *child) {
@@ -56,12 +58,27 @@ void Medium::addChild(const std::string &name, ConfigurableObject *child) {
 	}
 }
 
+// Air model phase function
+void Medium::createRayleighPhaseFunction(){
+	m_phaseFunctionRayleigh = static_cast<PhaseFunction *> (PluginManager::getInstance()->
+				createObject(MTS_CLASS(PhaseFunction), Properties("rayleigh")));
+	m_phaseFunctionRayleigh->configure();	
+}
+
+// Air model phase function
+bool Medium::isInteractedWithAir() {
+	Float u = m_random->nextFloat();
+	if ( u < BETA_AIR ) { return true; }
+	return false;
+}
+
 void Medium::configure() {
 	if (m_phaseFunction == NULL) {
 		m_phaseFunction = static_cast<PhaseFunction *> (PluginManager::getInstance()->
 				createObject(MTS_CLASS(PhaseFunction), Properties("isotropic")));
 		m_phaseFunction->configure();
 	}
+	 createRayleighPhaseFunction(); // Air model phase function
 }
 
 void Medium::serialize(Stream *stream, InstanceManager *manager) const {

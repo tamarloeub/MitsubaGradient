@@ -166,7 +166,7 @@ void ParticleTracer::process(const WorkUnit *workUnit, WorkResult *workResult,
             /* ==================================================================== */
             /*                 Radiative Transfer Equation sampling                 */
             /* ==================================================================== */
-			if (medium && medium->sampleDistance(Ray(ray, 0, its.t), mRec, m_sampler, false)) {
+			if (medium && medium->sampleDistance(Ray(ray, 0, its.t), mRec, m_sampler, false, false)) {
 				/* Sample the integral
 				  \int_x^y tau(x, x') [ \sigma_s \int_{S^2} \rho(\omega,\omega') L(x,\omega') d\omega' ] dx'
 				*/

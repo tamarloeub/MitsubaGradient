@@ -116,12 +116,14 @@ public:
 			cout << "start:" << endl;
 
 		Float q = 1.0;
+		bool isAir = false; //air model phase function
+		Medium *medium_notconst = const_cast<Medium*> (rRec.medium);
 
 		while (rRec.depth <= m_maxDepth || m_maxDepth < 0) {
 			/* ==================================================================== */
 			/*                 Radiative Transfer Equation sampling                 */
 			/* ==================================================================== */
-			if (rRec.medium && rRec.medium->sampleDistance(Ray(ray, 0, its.t), mRec, rRec.sampler, print_out)) {
+			if (rRec.medium && rRec.medium->sampleDistance(Ray(ray, 0, its.t), mRec, rRec.sampler, print_out, isAir)) {
 				/* Sample the integral
 				   \int_x^y tau(x, x') [ \sigma_s \int_{S^2} \rho(\omega,\omega') L(x,\omega') d\omega' ] dx'
 				*/
@@ -137,6 +139,10 @@ public:
 				}
 
 				const PhaseFunction *phase = rRec.medium->getPhaseFunction();
+				// air model phase function - start
+				const PhaseFunction *phaseRayleigh = rRec.medium->getRayleighPhaseFunction();
+				isAir = medium_notconst->isInteractedWithAir();
+				// air model phase function - end
 
 				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 
@@ -162,7 +168,15 @@ public:
 							rRec.nextSample2D(), rRec.sampler);
 
 					if (!value.isZero()) {
-						Spectrum LEi = value * phase->eval(PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d));
+						// air model phase function - start
+						Spectrum LEi = value;
+						if (isAir) { 
+							LEi *= phaseRayleigh->eval(PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d));
+						} else {
+							LEi *= phase->eval(PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d));
+						}
+						// air model phase function - end
+						
 						Li += throughput * LEi;
 
 						MediumSamplingRecord mdRec;
@@ -172,7 +186,7 @@ public:
 							densityDerivative[mRec.scoreIndxs[i]] += Spectrum(mRec.scoreVals[i] * throughput * LEi);
 						}
 
-						rRec.medium->derivateDensity(rayD, mdRec, true, print_out, dRec.dist);//18_3
+						rRec.medium->derivateDensity(rayD, mdRec, true, print_out, dRec.dist, isAir);//18_3 //air model phase function
 						for(std::vector<int>::size_type i = 0; i != mdRec.scoreIndxs.size(); i++) {
 							densityDerivative[mdRec.scoreIndxs[i]] += Spectrum(mdRec.scoreVals[i] * throughput * LEi);
 							if (print_out) {
@@ -194,7 +208,16 @@ public:
 				/* ==================================================================== */
 
 				PhaseFunctionSamplingRecord pRec(mRec, -ray.d);
-				Float phaseVal = phase->sample(pRec, rRec.sampler);
+				
+				// air model phase function - start
+				Float phaseVal;
+				if (isAir) {
+					phaseVal = phaseRayleigh->sample(pRec, rRec.sampler);	
+				} else {
+					phaseVal = phase->sample(pRec, rRec.sampler);	
+				}
+				// air model phase function - end
+				
 				if (phaseVal == 0)
 					break;
 				throughput *= phaseVal;

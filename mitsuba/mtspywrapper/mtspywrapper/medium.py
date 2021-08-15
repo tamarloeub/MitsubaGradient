@@ -9,11 +9,12 @@ import datetime
 
 class pyMedium(object):
     def __init__(self):
-        self._pmgr    = PluginManager.getInstance()
-        self._density = None
-        self._albedo  = 1
-        self._phase   = None
-        self._scale   = 1
+        self._pmgr         = PluginManager.getInstance()
+        self._density      = None
+        self._albedo       = 1
+        self._phase        = None
+        self._phase_type   = ''
+        self._scale        = 1
         self._bounding_box = None
         self._shape        = ()
         self._medium_path  = 'Myscenes/' + datetime.datetime.now().strftime("%y_%m_%d_%H:%M:%S:%f")[:-3]
@@ -98,7 +99,7 @@ class pyMedium(object):
             volume = volume[..., np.newaxis]
         
         ## need to be in seperate function.
-        #Duplicate dimensions with 1 cell (currently mitsuba accepts only >2 grid points per dimension)
+        # Duplicate dimensions with 1 cell (currently mitsuba accepts only >2 grid points per dimension)
         shape = volume.shape
         dup = [1, 1, 1, 1]
         for i in range(3):
@@ -128,8 +129,8 @@ class pyMedium(object):
         assert ( (volume.max() <= 1) and (volume.min() >= 0) ), "Values of albedo should be between 0 to 1" 
 
         if volume.ndim == 4:
-            assert (volume.shape[3] == 3),"albedo fourth dimention should be of size 3"
-            
+            assert (volume.shape[3] == 3), "albedo fourth dimension should be of size 3"
+
         if volume.shape == ():
             self._albedo = data
         else:
@@ -138,22 +139,25 @@ class pyMedium(object):
             else:
                 assert self._shape[:,:,:] == volume.shape, "Grid volume does not agree with medium shape" 
             if (volume.ndim <= 3):
-                self._albedo = dup_volume(volume, [1, 1, 1, 3])
+                self._albedo = self.dup_volume(volume, [1, 1, 1, 3])
             self.set_vol_file(self._albedo, 'albedo')
     
-    def set_phase(self, data=0.85):
-        volume = np.array(data)
-        assert ( (volume.max() < 1) and (volume.min() > -1) ), "Values of g should be between -1 to 1, but not equal"    
-        if volume.shape == ():
-            self._phase = float(data)
-        else:
-            if self._shape == () : 
-                self.set_volume(volume.shape)
+    def set_phase(self, phase_type='hg', data=0.85):
+        self._phase_type = str(phase_type)
+        
+        if phase_type is not 'rayleigh':
+            volume = np.array(data)
+            assert ( (volume.max() < 1) and (volume.min() > -1) ), "Values of g should be between -1 to 1, but not equal"    
+            if volume.shape == ():
+                self._phase = float(data)
             else:
-                assert self._shape == volume.shape, "Grid volume does not agree with medium shape"                    
-                
-            self._phase = volume
-            self.set_vol_file(volume, 'phase')
+                if self._shape == () : 
+                    self.set_volume(volume.shape)
+                else:
+                    assert self._shape == volume.shape, "Grid volume does not agree with medium shape"                    
+                    
+                self._phase = volume
+                self.set_vol_file(volume, 'phase')
         
     def set_volume(self, shape):    
         if shape == ():
@@ -205,7 +209,10 @@ class pyMedium(object):
    
     def get_phase_data(self):
         return self._phase    
-        
+    
+    def get_phase_type(self):
+        return self._phase_type 
+    
     def get_world_transform(self):
         bb           = self._bounding_box
         bottom_left  = Vector(bb[0], bb[1], bb[2])
@@ -246,23 +253,29 @@ class pyMedium(object):
         return density_str
 
     def phase_to_mitsuba(self):
-        volume = self.get_phase_data()
-        if np.array(volume).shape == ():
+        _type = self._phase_type
+        if _type is 'rayleigh':
             phase_str = {
-                'type' : 'hg',
-                'g' : {
-                    'type' : 'constvolume',
-                    'value' : volume
-                }
-            }            
+                'type' : _type
+            }                        
         else:
-            phase_str = {
-                'type' : 'hg',
-                'g' : {
-                    'type' : 'gridvolume',
-                    'filename' : self._files['phase']
+            volume = self.get_phase_data()
+            if np.array(volume).shape == ():
+                phase_str = {
+                    'type' : _type,
+                    'g' : {
+                        'type' : 'constvolume',
+                        'value' : volume
+                    }
+                }            
+            else:
+                phase_str = {
+                    'type' : _type,
+                    'g' : {
+                        'type' : 'gridvolume',
+                        'filename' : self._files['phase']
+                    }
                 }
-            }
         return phase_str
 
     def bounding_box_to_mitsuba(self, scene_type='smallMedium'):
@@ -320,33 +333,39 @@ class pyMedium(object):
         return dictionary
 
     def phase_to_dict(self):
-        volume = np.array(self.get_phase_data())
-        if volume.shape == ():
+        _type = self._phase_type
+        if _type is 'rayleigh':
             dictionary = {
-                'type'   : 'hg',
-                'volume' : {
-                    'name'  : 'g',
-                    'type'  : 'constvolume',
-                    'float' : {
-                        'name'  : 'value',
-                        'value' : float(volume)
-                    }
-                }
+                'type'   : _type,
             }
             
         else:
-            file_name  = os.path.realpath(self._files['phase'])
-            dictionary = {
-                'type'   : 'hg',
-                'volume' : {
-                    'name'   : 'g',
-                    'type'   : 'gridvolume',
-                    'string' : {
-                        'name'  : 'filename',
-                        'value' : file_name
+            volume = np.array(self.get_phase_data())
+            if volume.shape == ():
+                dictionary = {
+                    'type'   : _type,
+                    'volume' : {
+                        'name'  : 'g',
+                        'type'  : 'constvolume',
+                        'float' : {
+                            'name'  : 'value',
+                            'value' : float(volume)
+                        }
                     }
                 }
-            }
+            else:
+                file_name  = os.path.realpath(self._files['phase'])
+                dictionary = {
+                    'type'   : _type,
+                    'volume' : {
+                        'name'   : 'g',
+                        'type'   : 'gridvolume',
+                        'string' : {
+                            'name'  : 'filename',
+                            'value' : file_name
+                        }
+                    }
+                }
         return dictionary
 
     def albedo_to_dict(self):

@@ -51,6 +51,7 @@ class pyScene(object):
         self._pmgr   = PluginManager.getInstance()
         self._medium = None
         self._sensor = None
+        self._sun_irradiance = None
 
         self._scene_set      = False        
         self._integrator_str = None
@@ -113,7 +114,7 @@ class pyScene(object):
         #zmax = self._medium._bounding_box[-1]
         ##tz   = (zmax - zmin)
         tz   = 0
-        self._ocean.set_diffuse(Spectrum(0.01))
+        self._ocean.set_diffuse(Spectrum(0.06))
         #self._ocean.set_transz(-tz)
         self._ocean.set_scalexy(100)
         
@@ -127,23 +128,29 @@ class pyScene(object):
             'toWorld' : Transform.translate(Vector(0, 0, -tz)).scale(Vector(scalexy, scalexy, 1.))#Vector(1., 1.,20.))
         }) 
    
-    def set_emitter(self):
+    def set_emitter(self, value=None):
         # Create a light source
+        if value is None:
+            value = 100
+        self._sun_irradiance = value
+        
         self._emitter_str = self._pmgr.create({
             'type' : 'directional',
             'direction' : Vector(0, 0, -1),
             #'toWorld' :  Transform.rotate(Vector(0,0,1), 180),            
-            'irradiance' : Spectrum(100)
+            'irradiance' : Spectrum(value)
         })
 
-    def set_medium(self, beta, albedo=None, bounding_box=None, g=None):    
+    def set_medium(self, beta, albedo=None, bounding_box=None, phase='', g=None):    
         # Create medium with bounding box
         self._medium = pyMedium()
+        if phase is '':
+            phase = 'hg'
         if g is None:
             g = 0.85
         if albedo is None:
             albedo = 1             
-        self._medium.set_phase(g)
+        self._medium.set_phase(phase, g)
         self._medium.set_albedo(albedo)
 
         # Define the extinction field (\beta) in [km^-1]
@@ -167,7 +174,7 @@ class pyScene(object):
 
         self._medium.set_density(beta, bounding_box)   
 
-    def set_scene(self, beta=(), albedo=None, sensorType=None, points=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, bounding_box=None, g=None, rrDepth=None):
+    def set_scene(self, beta=(), albedo=None, sensorType=None, points=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, bounding_box=None, phase='', g=None, rrDepth=None, irradiance=None):
         if points is None:
             points = dict()
             points['origin'] = Point(0, 0, 3)
@@ -181,10 +188,10 @@ class pyScene(object):
         if points['up']     is None:
             points['up']     = Vector(1, 0, 0)           
 
-        self.set_medium(beta, albedo, bounding_box, g)
+        self.set_medium(beta, albedo, bounding_box, phase, g)
         self.set_sensor_film_sampler(sensorType, points, nSamples, fov_f, fov, width, height)        
         self.set_integrator(rrDepth)
-        self.set_emitter()
+        self.set_emitter(irradiance)
         self.set_ocean()
         self._scene_set = True
 
@@ -211,7 +218,7 @@ class pyScene(object):
 
         return self._scene
 
-    def create_new_scene(self, beta=(), albedo=None, sensorType=None, origin=None, target=None, up=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, scene_type='smallMedium', bounding_box=None, g=None, rrDepth=None):
+    def create_new_scene(self, beta=(), albedo=None, sensorType=None, origin=None, target=None, up=None, nSamples=4096, fov_f=False, fov=None, width=None, height=None, scene_type='smallMedium', bounding_box=None, phase='', g=None, rrDepth=None, irradiance=None):
         if (origin is not None) and (target is not None) and (up is not None):
             points           = dict()
             points['origin'] = origin
@@ -219,7 +226,7 @@ class pyScene(object):
             points['up']     = up     
         else:
             points = None
-        self.set_scene(beta, albedo, sensorType, points, nSamples, fov_f, fov, width, height, bounding_box, g, rrDepth)
+        self.set_scene(beta, albedo, sensorType, points, nSamples, fov_f, fov, width, height, bounding_box, phase, g, rrDepth, irradiance)
         self.configure_scene(scene_type)
         self.scene_to_xml()
         return
@@ -228,6 +235,7 @@ class pyScene(object):
         new_scene         = pyScene()
         new_scene._medium = self._medium
         new_scene._sensor = self._sensor
+        new_scene._sun_irradiance = self._sun_irradiance
 
         new_scene._scene_set      = self._scene_set
         new_scene._integrator_str = self._integrator_str
@@ -272,7 +280,7 @@ class pyScene(object):
                 },
             'spectrum' : {
                 'name'  : 'irradiance',
-                'value' : '100'
+                'value' : str(self._sun_irradiance)
             }
         }
         return dictionary

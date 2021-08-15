@@ -22,6 +22,9 @@
 
 #include <mitsuba/core/netobject.h>
 #include <mitsuba/core/aabb.h>
+#include <mitsuba/core/random.h>
+
+static const double BETA_AIR = 0.02055366550609636; // blue channel
 
 MTS_NAMESPACE_BEGIN
 /**
@@ -130,7 +133,7 @@ public:
 	 *                 no interaction inside the medium could be sampled.
 	 */
 	virtual bool sampleDistance(const Ray &ray,
-		MediumSamplingRecord &mRec, Sampler *sampler, bool print_out) const = 0;
+		MediumSamplingRecord &mRec, Sampler *sampler, bool print_out, bool isAir) const = 0; //air model phase function
 
 	/**
 	 * \brief Compute the 1D density of sampling distance \a ray.maxt
@@ -164,12 +167,19 @@ public:
 		Sampler *sampler = NULL) const = 0;
 
 	// Tamar
-	virtual size_t getDensityVolumeSize() const=0;
+	virtual size_t getDensityVolumeSize() const = 0;
 
-	virtual void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out, Float dlength) const = 0; //18_3
+	virtual void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out, Float dlength, 
+										bool isAir) const = 0; //18_3 //air model phase function
 
 	/// Return the phase function of this medium
 	inline const PhaseFunction *getPhaseFunction() const { return m_phaseFunction.get(); }
+	
+	/// Return the rayleigh phase function of this medium
+	inline const PhaseFunction *getRayleighPhaseFunction() const { return m_phaseFunctionRayleigh.get(); }
+	
+	/// Sample whether the photon interacted with air molecule or other. true if air
+	virtual bool isInteractedWithAir() ;
 
 	/// Determine whether the medium is homogeneous
 	virtual bool isHomogeneous() const = 0;
@@ -193,6 +203,9 @@ public:
 	/** \brief Configure the object (called \a once after construction
 	   and addition of all child \ref ConfigurableObject instances). */
 	virtual void configure();
+
+	/// Air model phase function - create another phase functionfor the air molecules - rayleigh phase function
+	virtual void createRayleighPhaseFunction();
 
 	/// Serialize this medium to a stream
 	virtual void serialize(Stream *stream, InstanceManager *manager) const;
@@ -222,6 +235,8 @@ protected:
 	virtual ~Medium() { }
 protected:
 	ref<PhaseFunction> m_phaseFunction;
+	ref<PhaseFunction> m_phaseFunctionRayleigh;
+	ref<Random> m_random;
 	Spectrum m_sigmaA;
 	Spectrum m_sigmaS;
 	Spectrum m_sigmaT;

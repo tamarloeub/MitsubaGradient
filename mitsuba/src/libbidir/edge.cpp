@@ -34,7 +34,7 @@ bool PathEdge::sampleNext(const Scene *scene, Sampler *sampler,
 	/* Sample the RTE in-scattering integral -- this determines whether the
 	   next vertex is invalid or a surface or medium scattering event */
 	MediumSamplingRecord mRec;
-	if (medium && medium->sampleDistance(Ray(ray, 0, its.t), mRec, sampler, false)) {
+	if (medium && medium->sampleDistance(Ray(ray, 0, its.t), mRec, sampler, false, false)) {
 		succ->type = PathVertex::EMediumInteraction;
 		succ->degenerate = false;
 		succ->getMediumSamplingRecord() = mRec;

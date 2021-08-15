@@ -323,7 +323,7 @@ public:
 		return m_density->getVoxelsSize();
 	}
 
-	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out, Float dlength) const { //18_3
+	void derivateDensity(const Ray &ray, MediumSamplingRecord &mRec, bool isDirectRay, bool print_out, Float dlength, bool isAir) const { //18_3
 		// int* volSize = m_density->getVolumeSizeVec();
 		// cout << volSize << endl;
 		// Float devDensity = new Float[volSize[0]][volSize[1]][volSize[2]];
@@ -422,12 +422,13 @@ public:
 			mRec.scoreIndxs.insert(mRec.scoreIndxs.end(), inIndxs.begin(), inIndxs.end());
 
 			Float densityAtT = lookupDensity(p, ray.d) * m_scale;
+			densityAtT -= BETA_AIR; // air model: subtracting \beta^{air} from the total \beta
 			Float density_eps = 0.001;
 			Float factor;
 			Float density_factor;
-			if ( (i == nSteps) && (isDirectRay == false) ){ //&& (densityAtT > 0) ) {
+			if ( (i == nSteps) && (isDirectRay == false) ) { //&& (densityAtT > 0) ) {
 				// calculating :  inDev *= (1 / betaAtT -stepSize )
-				if (densityAtT < 0.5) {
+				if ( (densityAtT < density_eps * 10) || (isAir == true) ) { //air model phase function
 					factor = 0;
 				} else {
 					density_factor = sqrt( pow(densityAtT, 2.0) + pow(density_eps, 2) );
@@ -791,10 +792,9 @@ public:
 	}
 
 	bool sampleDistance(const Ray &ray, MediumSamplingRecord &mRec,
-			Sampler *sampler, bool print_out) const {
+			Sampler *sampler, bool print_out, bool isAir) const {
 		Float integratedDensity, densityAtMinT, densityAtT;
 		bool success = false;
-//		bool DEBUG_TAMAR = 1;
 		bool DEBUG_TAMAR = print_out;
 
 		if (m_method == ESimpsonQuadrature) {
@@ -894,8 +894,7 @@ public:
 					mRec.p = p;
 					Spectrum albedo = m_albedo->lookupSpectrum(p);
 					mRec.sigmaS = albedo * densityAtT;
-					// Tamar
-					mRec.beta   = densityAtT;
+					mRec.beta   = densityAtT; // Tamar					
 					mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 					mRec.transmittance = Spectrum(densityAtT != 0.0f ? 1.0f / densityAtT : 0);
 					if (!std::isfinite(mRec.transmittance[0])) // prevent rare overflow warnings
@@ -907,7 +906,7 @@ public:
 					if (print_out)
 						cout << ray.toString() << endl;
 
-					derivateDensity(ray, mRec, false, print_out, 0.0); //18_3
+					derivateDensity(ray, mRec, false, print_out, 0.0, isAir); //18_3 //air model phase function
 
 					mRec.medium = this;
 					success = true;
