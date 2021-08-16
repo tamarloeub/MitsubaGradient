@@ -185,9 +185,9 @@ crop_s     = ''
 # crop_s     = 'c2 '
 
 ### small cloudfield
-# full_cloud = sio.loadmat('CloudsSim/jpl/small_cloud_field.mat')
-# full_cloud = full_cloud['beta_smallcf']
-# crop_s     = 'small cf '
+#full_cloud = sio.loadmat('CloudsSim/jpl/small_cloud_field.mat')
+#full_cloud = full_cloud['beta_smallcf']
+#crop_s     = 'small cf '
 
 
 ## cloud 1
@@ -249,26 +249,28 @@ else:
 full_cloud     = np.pad(full_cloud, pad_width=npad, mode='constant', constant_values=0.01)
 [ nx, ny, nz ] = full_cloud.shape
 
-# manually creates mask
-ind0x, ind0y, ind0z    = np.where(full_cloud < minval)
-non0_x, non0_y, non0_z = np.where(full_cloud >= minval)
-ind0f                  = np.where(full_cloud.flatten('F') < minval) 
-non0_f                 = np.where(full_cloud.flatten('F') >= minval)
+## manually creates mask
+#ind0x, ind0y, ind0z    = np.where(full_cloud < minval)
+#non0_x, non0_y, non0_z = np.where(full_cloud >= minval)
+#ind0f                  = np.where(full_cloud.flatten('F') < minval) 
+#non0_f                 = np.where(full_cloud.flatten('F') >= minval)
+#full_cloud[ind0x, ind0y, ind0z] = 0.01
 
-full_cloud[ind0x, ind0y, ind0z] = 0.01
+# set small density values to "air" density
+full_cloud[np.where(full_cloud < minval)] = 0.01
 
 n_sensors = 9
 
-## Update Mask to space curving mask
+## Space curving mask
 mask_name = 'mask original ' + str(team) + 'with air ' + crop_s + str(np.prod(full_cloud.shape)) + ' grid points ' + str(n_sensors)
-if crop_s == '':
-    mask_name += ' sensors above the medium 1 cycle ' + str(np.power(np.max([nx, ny]) * 2, 2)) + ' pixels.mat'
+if crop_s == '' or crop_s == 'cloud1 ' or crop_s == 'cloud2 ':
+    mask_name += ' sensors above the medium 1 cycle ' + str(np.power(np.max([np.min((nx * 2, 100)) , np.min((ny * 2, 100)) ]), 2)) + ' pixels.mat'
 else:
     mask_name += ' sensors above the medium 1 cycle ' + str(np.power(np.max([nx, ny]), 2)) + ' pixels.mat'
 mask      = sio.loadmat(mask_name)
 load_mask = mask['mask']
 
-if crop_s == 'small cf ' or crop_s == 'c2 ': 
+if crop_s == 'small cf ' or crop_s == 'c2 ' or crop_s == 'cloud1 ': 
     beta_gt = full_cloud
     mask    = load_mask    
 
@@ -280,8 +282,12 @@ else:
 
     beta_gt = full_cloud
     mask    = load_mask
-
-    if enlarged_f:
+    if crop_s == 'cloud2 ': 
+        npad = ((0, 0), (1, 1), (0, 0))  
+        beta_gt = np.pad(full_cloud, pad_width=npad, mode='constant', constant_values=0.01)
+        mask    = np.pad(load_mask, pad_width=npad, mode='constant', constant_values=0)        
+        
+    elif enlarged_f:
         enlarge_scale  = 3.
         beta_gt        = zoom(beta_gt, enlarge_scale)
         mask           = zoom(mask, enlarge_scale)
@@ -298,6 +304,7 @@ else:
         beta_gt = np.pad(full_cloud, pad_width=npad, mode='constant', constant_values=0.01)
         mask    = np.pad(load_mask, pad_width=npad, mode='constant', constant_values=0)
 
+# making the mask a binary map
 ind0x, ind0y, ind0z    = np.where(mask <= 0.07)  # == 0)
 non0_x, non0_y, non0_z = np.where(mask > 0.07)   # 0)
 ind0f  = np.where(mask.flatten('F') <= 0.07)     # == 0)
@@ -324,23 +331,34 @@ mb         = np.zeros(max_iterations)
 mass_err   = np.zeros(max_iterations)
 
 # sensors parameters
-if crop_s == '':
-    n_pixels_w = nx * 2  # resolution ~= spacing / 2 = 10 meters
-    n_pixels_h = ny * 2
+if crop_s == '' or crop_s == 'cloud1 ' or crop_s == 'cloud2 ':
+    n_pixels_w = np.min([nx * 2, 100]) # resolution ~= spacing / 2 = 10 meters
+    n_pixels_h = np.min([ny * 2, 100])
 else:
     n_pixels_w = nx # resolution ~= spacing = 20 meters
     n_pixels_h = ny 
 n_pixels = n_pixels_h * n_pixels_w
 
-# multi-scale parameters
-fractal_dim = 2 - 0.4
-# grid_ms  = nx / np.round(np.array([ 5., 5.*(fractal_dim), 5.*(fractal_dim)**2, 5.*(fractal_dim)**3, float(nx) ]))
+## multi-scale parameters
+#fractal_dim = 2 - 0.4
+## grid_ms  = nx / np.round(np.array([ 5., 5.*(fractal_dim), 5.*(fractal_dim)**2, 5.*(fractal_dim)**3, float(nx) ]))
 
 if crop_s == '':
     grid_ms  = nx / np.round(np.array([4., 4. * np.sqrt(2), 4. * np.sqrt(2) ** 2, 4. * np.sqrt(2) ** 3, 4. * np.sqrt(2) ** 4,
                   4. * np.sqrt(2) ** 5, 4. * np.sqrt(2) ** 6, float(nx)]))
     n_stages = len(grid_ms)
     grid_ms  = np.repeat(grid_ms[:, np.newaxis], 3, axis=1)
+    if crop_s == 'cloud1 ':# or crop_s == 'cloud2 ':
+        grid_ms[:, 2] =  nz / np.round(np.array([4., 4. * np.sqrt(2), 4. * np.sqrt(2) ** 2, 4. * np.sqrt(2) ** 3, 4. * np.sqrt(2) ** 4,
+                  4. * np.sqrt(2) ** 5, float(nz), float(nz)]))
+elif crop_s == 'cloud2 ':  #
+    grid_ms_x = nx / np.round(np.array([4., 4. * 2, 4. * 2 ** 2, 4. * 2 ** 3, float(nx)]))
+    n_stages  = len(grid_ms_x)
+    grid_ms   = np.zeros((n_stages, 3))
+    grid_ms[:, 0] = grid_ms_x
+    grid_ms[:, 1] = ny / np.round(np.array([4., 4. * 2, 4. * 2 ** 2, 4. * 2 ** 3, float(nx)]))    
+    grid_ms[:, 2] = nz / np.round(np.array([4., 4. * 2, 4. * 2 ** 2, 4. * 2 ** 3, float(nz)]))
+        
 else:  # beta has different voxels size in each axis
     grid_ms_x = nx / np.round(np.array([4., 4. * 2, 4. * 2 ** 2, 4. * 2 ** 3, 4. * 2 ** 4, float(nx)]))
     n_stages  = len(grid_ms_x)
@@ -352,8 +370,8 @@ else:  # beta has different voxels size in each axis
 iters_ms = np.zeros(n_stages, dtype=int)
 
 # optimizer parameters - ADAM
-if crop_s == '':
-    alpha = 1 #1.1 # 0.08 # randomly select alpha hyperparams -> r = -a * np.random.rand() ; alpha = 10**(r) - randomly selected from a logarithmic scale
+if crop_s == '' or crop_s == 'cloud1 ':# or crop_s == 'cloud2 ':
+    alpha = 1 #0.7    # randomly select alpha hyperparams -> r = -a * np.random.rand() ; alpha = 10**(r) - randomly selected from a logarithmic scale
 else:
     alpha = 0.3    # randomly select alpha hyperparams -> r = -a * np.random.rand() ; alpha = 10**(r) - randomly selected from a logarithmic scale
 
@@ -365,7 +383,7 @@ beta2       = 0.999
 
 # photons_total = np.array([512 * 18 *18])
 Np_vector = np.array([512 * 2])  # photons_total / n_pixels
-if crop_s == '':
+if crop_s == '' or crop_s == 'cloud1 ':
     gt_Np_fac = 8
 else:
     gt_Np_fac = 8 / 2
@@ -412,6 +430,12 @@ if crop_s == 'c2 ':
 elif crop_s == 'small cf ':
     H       = z_spacing * nz
     t_const = np.array([bounds[3] / 2., bounds[4] / 2., TOA / 4.])
+elif crop_s == 'cloud1 ':
+    H        = z_spacing * nz / 2.
+    t_const  = np.array([bounds[3] / 2., bounds[4] / 2., TOA * 2. / 3. ])
+elif crop_s == 'cloud2 ':
+    H        = z_spacing * nz * 5 / 12.
+    t_const  = np.array([bounds[3] / 2., bounds[4] / 2., TOA * 2. / 3. ])    
 else:
     H       = z_spacing * nz / 12  # 4.
     t_const = np.array([bounds[3] / 2., bounds[4] / 2., TOA * 2. / 3.])
@@ -439,6 +463,8 @@ if crop_s == 'c2 ':
     fov_rad = 2 * np.arctan(L / ((TOA + H) / 3))
 elif crop_s == 'small cf ':
     fov_rad = 2 * np.arctan(L * 1.75 / ((TOA + H)))
+elif crop_s == 'cloud1 ' or crop_s == 'cloud2 ':
+    fov_rad = 2 * np.arctan(L / ((TOA + H) / 4) )
 else:
     fov_rad = 2 * np.arctan(L / ((TOA + H) / 4))
 fov_deg = 180 * fov_rad / np.pi
@@ -451,6 +477,8 @@ r_toa       = np.linalg.norm(o[0] - t_const)  # creating a Dome and not a Circle
 for rr in range(n_cycles):
     if crop_s == 'c2 ' or crop_s == 'small cf ':
         sensors_radius = y_spacing * (ny + 16) / 2
+    elif crop_s == 'cloud1 ' or crop_s == 'cloud2 ':
+        sensors_radius = y_spacing * (ny + 12) / 2 
     else:
         sensors_radius = y_spacing * (ny + 12) / 2
         
@@ -468,8 +496,11 @@ for rr in range(n_cycles):
 gt_out = ''
 if enlarged_f:
     gt_out += 'enlarged '
-
-rr_depth = None
+    
+if crop_s == 'cloud2 ':
+    rr_depth = 10000
+else:
+    rr_depth = None
 
 if rr_depth is not None:
     rr_str = ' rrDepth ' + str(rr_depth)
@@ -481,7 +512,91 @@ gt_out += str(n_sensors) + ' sensors all above the medium 1 ' + formation_s + st
 gt_out += str(Np_vector[0] * gt_Np_fac) + ' photons' + rr_str + '.mat'
 
 if (not os.path.isfile(gt_out)) or render_gt_f:
+    render_gt_f = True
     I_gt = np.zeros((n_sensors, n_pixels_h, n_pixels_w))
+    
+    
+## ------------------------------------------------------------------------------------------------------- ##
+## --------------------------- Start - beta air with exponential approximation --------------------------- ## 
+
+#def calculate_beta_air(scene_f, delta_z, wavelength=672, is_const=False):
+    #if scene_f == 'small cf ':
+        #nx = 2*102
+        #ny = 2*102
+        #nz = 54
+    #elif scene_f == '':
+        #nx = 2*50
+        #ny = 2*50
+        #nz = 42
+    
+    #lambda_  = wavelength * 1e-3 # nm to microns
+    #H_air    = 10.4              # km
+    
+    #h_min = 0            # km    
+    #z_TOA = nz * delta_z # km
+    
+    ## calculating beta air   
+    #if is_const:
+        #beta_const = 1.09e-3 * lambda_**(-4.05) * H_air * (1 - np.exp(-z_TOA / H_air)) / z_TOA
+        #mbeta_air  = np.ones([nx, ny, nz]) * beta_const
+    #else:
+        #z     = np.linspace(h_min, z_TOA, nz) # km
+        #vbeta_air = 1.09e-3 * lambda_**(-4.05) * np.exp( -z / H_air )
+    
+        #mbeta_air = np.reshape(vbeta_air, [1, 1, nz], 'F')
+        #mbeta_air = np.repeat(np.repeat(mbeta_air, nx, axis=0), ny, axis=1)
+    
+    #return mbeta_air
+        
+
+#wavelength_red   = 655 # [nm] # sun irradiance = 1.66 
+#wavelength_green = 555 # [nm] # sun irradiance = 1.92
+#wavelength_blue  = 475 # [nm] # sun irradiance = 1.98
+
+#is_const = True    
+#beta_air = calculate_beta_air(crop_s, z_spacing, wavelength_blue, is_const)
+
+#[nxa, nya, nza] = beta_air.shape
+
+#nbounds     = np.zeros_like(bounds)
+#nbounds[:3] = medium_center - np.array([nxa, nya, nza]) / 2. * np.array([x_spacing, y_spacing, z_spacing])
+#nbounds[3:] = medium_center + np.array([nxa, nya, nza]) / 2. * np.array([x_spacing, y_spacing, z_spacing])
+#nbounds[2]  = 0.
+#nbounds[5]  = nza * z_spacing
+    
+#bounds  = nbounds
+#beta_gt = beta_air
+
+#for ss in range(n_sensors):
+    #newUp, _ = transformLookAt(o[ss], t[ss], u[ss])
+    #sensors_pos[ss] = {'origin': Point(o[ss][0],  o[ss][1], o[ss][2]),
+                       #'target': Point(t[ss][0],  t[ss][1], t[ss][2]),
+                       #'up'    : Vector(newUp[0], newUp[1], newUp[2])}
+    #scene_gt = pyScene()
+    #scene_gt.create_new_scene(beta=beta_gt, g=0.85, origin=sensors_pos[ss]['origin'], target=sensors_pos[ss]['target'],
+                              #up=sensors_pos[ss]['up'], nSamples=int(Np_vector[0] * gt_Np_fac), sensorType='perspective',
+                              #bounding_box=bounds, fov=fov_deg, width=n_pixels_w, height=n_pixels_h, rrDepth=rr_depth)
+
+    #path = '/home/tamarl/Mitsuba_from_git/MitsubaGradient/mitsuba/Myscenes/gt_scenes_Feb_2021/'
+    #path = os.path.join(path, 'small_cf/only_air_const_tau/')
+    #dst = os.path.join(path, str(ss))
+    #if not os.path.exists(dst):
+        #os.makedirs(dst)
+    
+    #src = os.path.dirname(scene_gt._medium._files['density'])
+    #src_files = os.listdir(src)
+    #for file_name in src_files:
+        #full_file_name = os.path.join(src, file_name)
+        #if os.path.isfile(full_file_name):
+            #if file_name == 'scene.xml':
+                #dst_fpath = os.path.join(dst, 'scene_b.xml')
+                #shutil.copy(full_file_name, dst_fpath)                    
+            ##else:
+                ##dst_fpath = os.path.join(dst, file_name)
+            ##shutil.copy(full_file_name, dst_fpath)    
+
+## ------------------------------------------------------------------------------------------------------- ##
+## ---------------------------- End - beta air with exponential approximation ---------------------------- ## 
 
 for ss in range(n_sensors):
     newUp, _ = transformLookAt(o[ss], t[ss], u[ss])
@@ -509,9 +624,9 @@ else:
     gt = sio.loadmat(gt_out)
     I_gt = gt['I_gt']
 
-if crop_s == '':
-    slambda_v = np.array([5 * 1e-1])
-    mlambda_v = np.array([0.5])
+if crop_s == '' or crop_s == 'cloud1 ' or crop_s == 'cloud2 ':
+    slambda_v = np.array([5 * 1e-1]) #([25 * 1e-1])
+    mlambda_v = np.array([0.5]) #([0.25])
 else:
     slambda_v = np.array([1])  # 0.1, 1e-2,1e-3, 1e-4, 1e-5])
     mlambda_v = np.array([1])
@@ -595,9 +710,9 @@ for ll in range(len(slambda_v)):
 
         beta_zoom_out = np.copy(beta0)
         [nx_ms, ny_ms, nz_ms] = beta.shape
-        if crop_s == '':
-            n_pixels_w = np.max([nx_ms, ny_ms]) * 2  # resolution ~= spacing / 2 = 10 meters
-            n_pixels_h = np.max([nx_ms, ny_ms]) * 2
+        if crop_s == '' or crop_s == 'cloud1 ':
+            n_pixels_w = np.min([np.max([nx_ms, ny_ms]) * 2, 100])  # resolution ~= spacing / 2 = 10 meters
+            n_pixels_h = np.min([np.max([nx_ms, ny_ms]) * 2, 100])
         else:
             n_pixels_w = np.max([nx_ms, ny_ms]) # resolution ~= spacing / 2 = 10 meters
             n_pixels_h = np.max([nx_ms, ny_ms])
@@ -609,6 +724,8 @@ for ll in range(len(slambda_v)):
 
         I_algo  = np.zeros((n_sensors, len(beta0_diff), n_pixels_h, n_pixels_w))
         I_gt_ms = zoom(I_gt, (1, 1 / grid_ms[stage, 0], 1 / grid_ms[stage, 1]))
+
+        min_mb = 0
 
         start = time.time()
 
@@ -622,6 +739,20 @@ for ll in range(len(slambda_v)):
             if debug_f:
                 print("iteration = " + str(iteration))
                 print("error = " + str(np.round(mb[iteration], 2)))
+
+            if (mb[iteration] < min_mb):
+                min_mb = mb[iteration]
+                bb0 = beta0_diff[bb]
+                sio.savemat(out_path + out_name + ' min_mb.mat',
+                            {'beta0_diff': beta0_diff[bb], 'mask': mask, 'beta_gt': beta_gt,  # Scene pre-fixed params
+                             'alpha': alpha, 'beta1': beta1, 'beta2': beta2,                  # Optimization hyper-params
+                             'smooth_lambda': slambda, 'smooth_term': smooth_term,            # Smooth prior
+                             'monoz_lambda': mlambda, 'monoZ_term': monoZ_term,               # Monotonically increasing z prior
+                             'first_moment': first_moment, 'second_moment': second_moment,    # Optimization iters params
+                             'stage': stage, 'iters_ms': iters_ms, 'alpha_scale': alpha_scale,
+                             'Np_ms': Np_ms, 'grid_ms': grid_ms,                              # Multiscale
+                             'cost_data': cost_data, 'cost_mean': cost_mean, 'I_algo': I_algo, 'runtime': runtime, 'mb': mb,
+                             'iteration': iteration, 'mass_err': mass_err, 'beta': beta})     # algorithm calculated variables
 
             cost_grad = np.zeros(grid_size)
             cost_iter = 0
@@ -735,6 +866,8 @@ for ll in range(len(slambda_v)):
                 if stage == n_stages - 1 : 
                     beta[ ind0x, ind0y, ind0z ] = 0.01
                     Np_scale = 1                    
+                    beta_zoom_out = zoom(beta, grid_ms[stage])  # (grid_ms[stage], grid_ms[stage], grid_ms[stage]))
+                    min_mb        = np.sum(np.sum(np.sum(abs(beta_zoom_out - beta_gt), 2), 1), 0) / np.sum(beta_gt_flat) * 100
                 else:
                     Np_scale /= 2.
 
@@ -744,7 +877,7 @@ for ll in range(len(slambda_v)):
                 beta_f = beta.flatten('F')
 
                 [nx_ms, ny_ms, nz_ms] = beta.shape
-                if crop_s == '':
+                if crop_s == '' or crop_s == 'cloud1 ':
                     n_pixels_w = np.max([nx_ms, ny_ms]) * 2 # resolution ~= spacing / 2 = 10 meters
                     n_pixels_h = np.max([nx_ms, ny_ms]) * 2
                 else:
